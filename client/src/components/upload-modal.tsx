@@ -1,0 +1,382 @@
+import { useState, useCallback } from "react";
+import { useDropzone } from "react-dropzone";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useUpload } from "@/hooks/use-upload";
+import { useDocuments } from "@/hooks/use-documents";
+import { useCarriers } from "@/hooks/use-carriers";
+import { Upload, FileText, X, Check, AlertCircle, Calendar, Building2 } from "lucide-react";
+import { format } from "date-fns";
+
+interface UploadModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  documentType: "commission" | "renewal" | null;
+}
+
+export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps) {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [customFileName, setCustomFileName] = useState("");
+  const [selectedCarrierId, setSelectedCarrierId] = useState<string>("");
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicateDocument, setDuplicateDocument] = useState<any>(null);
+  const { uploadState, uploadFile, resetUpload } = useUpload();
+  const { data: documents } = useDocuments();
+  const { data: carriers, isLoading: carriersLoading } = useCarriers();
+
+  const sanitizeFileName = (fileName: string): string => {
+    // Remove file extension
+    const nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
+    // Replace spaces and special characters with underscores
+    return nameWithoutExt.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+  };
+
+  const generateFileName = (originalName: string, customName?: string): string => {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const sanitizedOriginal = sanitizeFileName(originalName);
+    const sanitizedCustom = customName ? sanitizeFileName(customName) : "";
+    
+    if (sanitizedCustom) {
+      return `${today}_${sanitizedCustom}_${sanitizedOriginal}`;
+    }
+    return `${today}_${sanitizedOriginal}`;
+  };
+
+  const checkForDuplicates = (file: File) => {
+    if (!documents) return false;
+    
+    const generatedName = generateFileName(file.name, customFileName);
+    const duplicate = documents.find(doc => 
+      doc.filename.includes(sanitizeFileName(file.name)) || 
+      doc.originalName === file.name
+    );
+    
+    if (duplicate) {
+      setDuplicateDocument(duplicate);
+      return true;
+    }
+    return false;
+  };
+
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      const file = acceptedFiles[0];
+      
+      // Validate file type
+      if (file.type !== "application/pdf") {
+        return;
+      }
+
+      // Validate file size (50MB)
+      if (file.size > 50 * 1024 * 1024) {
+        return;
+      }
+
+      // Check for duplicates
+      if (checkForDuplicates(file)) {
+        setShowDuplicateWarning(true);
+        setSelectedFile(file);
+      } else {
+        setSelectedFile(file);
+      }
+    }
+  }, [documents, customFileName]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "application/pdf": [".pdf"],
+    },
+    maxFiles: 1,
+    maxSize: 50 * 1024 * 1024,
+  });
+
+  const handleUpload = async () => {
+    if (selectedFile && documentType && selectedCarrierId) {
+      const finalFileName = generateFileName(selectedFile.name, customFileName);
+      await uploadFile(selectedFile, documentType, parseInt(selectedCarrierId), finalFileName);
+    }
+  };
+
+  const handleDuplicateConfirm = async () => {
+    setShowDuplicateWarning(false);
+    if (selectedFile && documentType && selectedCarrierId) {
+      const finalFileName = generateFileName(selectedFile.name, customFileName);
+      await uploadFile(selectedFile, documentType, parseInt(selectedCarrierId), finalFileName);
+    }
+  };
+
+  const handleDuplicateCancel = () => {
+    setShowDuplicateWarning(false);
+    setSelectedFile(null);
+    setDuplicateDocument(null);
+  };
+
+  const handleClose = () => {
+    setSelectedFile(null);
+    setCustomFileName("");
+    setSelectedCarrierId("");
+    setShowDuplicateWarning(false);
+    setDuplicateDocument(null);
+    resetUpload();
+    onClose();
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  };
+
+  const getDocumentTypeLabel = () => {
+    return documentType === "commission" ? "Commission Statement" : "Renewal Report";
+  };
+
+  const canUpload = selectedFile && documentType && selectedCarrierId && !uploadState.isUploading && !uploadState.isProcessing;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-semibold text-gray-900">
+            Upload Document
+          </DialogTitle>
+          <DialogDescription className="text-sm text-gray-600">
+            Upload your {getDocumentTypeLabel()} PDF file
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Carrier Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="carrier" className="text-sm font-medium text-gray-700">
+              Insurance Carrier *
+            </Label>
+            <div className="relative">
+              <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Select value={selectedCarrierId} onValueChange={setSelectedCarrierId}>
+                <SelectTrigger className="pl-10">
+                  <SelectValue placeholder="Select insurance carrier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {carriersLoading ? (
+                    <SelectItem value="" disabled>Loading carriers...</SelectItem>
+                  ) : (
+                    carriers?.map((carrier) => (
+                      <SelectItem key={carrier.id} value={carrier.id.toString()}>
+                        {carrier.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-gray-500">
+              Select the insurance carrier associated with this document
+            </p>
+          </div>
+
+          {/* Custom File Name Input */}
+          <div className="space-y-2">
+            <Label htmlFor="customFileName" className="text-sm font-medium text-gray-700">
+              Custom File Name (Optional)
+            </Label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="customFileName"
+                type="text"
+                placeholder="e.g., client_abc_january_commission"
+                value={customFileName}
+                onChange={(e) => setCustomFileName(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              Files will be named: {format(new Date(), "yyyy-MM-dd")}_{customFileName ? sanitizeFileName(customFileName) + "_" : ""}{selectedFile ? sanitizeFileName(selectedFile.name) : "filename"}
+            </p>
+          </div>
+
+          {/* Upload Area */}
+          {!selectedFile && (
+            <div
+              {...getRootProps()}
+              className={`
+                border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors
+                ${isDragActive 
+                  ? "border-blue-500 bg-blue-50" 
+                  : "border-gray-300 bg-gray-50 hover:border-blue-500 hover:bg-blue-50"
+                }
+              `}
+            >
+              <input {...getInputProps()} />
+              <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h4 className="text-lg font-medium text-gray-900 mb-2">
+                Drop your PDF file here
+              </h4>
+              <p className="text-gray-600 mb-4">or click to browse and select a file</p>
+              <div className="text-sm text-gray-500">
+                <p>Supported format: PDF only</p>
+                <p>Maximum file size: 50MB</p>
+              </div>
+            </div>
+          )}
+
+          {/* File Preview */}
+          {selectedFile && (
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <FileText className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-900">{selectedFile.name}</p>
+                  <p className="text-sm text-gray-600">{formatFileSize(selectedFile.size)}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedFile(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Upload Progress */}
+          {uploadState.isUploading && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-900">Uploading to S3...</span>
+                <span className="text-sm text-gray-600">{Math.round(uploadState.progress)}%</span>
+              </div>
+              <Progress value={uploadState.progress} className="h-2" />
+            </div>
+          )}
+
+          {/* Processing Status */}
+          {(uploadState.isProcessing || uploadState.progress === 100) && (
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3 text-sm">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                  <Check className="h-3 w-3 text-white" />
+                </div>
+                <span className="text-gray-700">File uploaded to S3 bucket</span>
+              </div>
+              
+              <div className="flex items-center space-x-3 text-sm">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                  uploadState.isProcessing 
+                    ? "border-2 border-blue-500" 
+                    : "bg-green-500"
+                }`}>
+                  {uploadState.isProcessing ? (
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                  ) : (
+                    <Check className="h-3 w-3 text-white" />
+                  )}
+                </div>
+                <span className="text-gray-700">
+                  {uploadState.isProcessing ? "Starting Textract analysis..." : "Textract analysis complete"}
+                </span>
+              </div>
+
+              <div className="flex items-center space-x-3 text-sm">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                  uploadState.isProcessing 
+                    ? "border-2 border-gray-300" 
+                    : "border-2 border-blue-500"
+                }`}>
+                  {!uploadState.isProcessing && (
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
+                  )}
+                </div>
+                <span className={uploadState.isProcessing ? "text-gray-500" : "text-gray-700"}>
+                  Processing results to CSV...
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Error Display */}
+          {uploadState.error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <p className="text-sm font-medium text-red-800">Upload Failed</p>
+              </div>
+              <p className="text-sm text-red-700 mt-1">{uploadState.error}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end space-x-3 pt-4 border-t">
+          <Button variant="outline" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleUpload}
+            disabled={!selectedFile || uploadState.isUploading || uploadState.isProcessing}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Upload Document
+          </Button>
+        </div>
+      </DialogContent>
+
+      {/* Duplicate Warning Dialog */}
+      <AlertDialog open={showDuplicateWarning} onOpenChange={setShowDuplicateWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center space-x-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              <span>Possible Duplicate File</span>
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                A similar file may already exist in your uploaded documents:
+              </p>
+              {duplicateDocument && (
+                <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-4 w-4 text-yellow-600" />
+                    <div>
+                      <p className="font-medium text-yellow-900">{duplicateDocument.originalName}</p>
+                      <p className="text-sm text-yellow-700">
+                        Uploaded on {format(new Date(duplicateDocument.uploadedAt), "MMM dd, yyyy")}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <p className="text-sm">
+                Are you sure you want to upload this file? This will create a new record and may result in duplicate processing.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleDuplicateCancel}>
+              Cancel Upload
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDuplicateConfirm}
+              className="bg-yellow-600 hover:bg-yellow-700"
+            >
+              Upload Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Dialog>
+  );
+}

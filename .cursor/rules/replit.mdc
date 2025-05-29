@@ -1,0 +1,40 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Replit Development Guidelines
+
+## **Server Management**
+- **DO NOT start local development servers** using `npm run dev`, `npm start`, or similar commands when working on Replit
+- Replit provides its own hosting environment that automatically serves the application
+- The user will test and run the application through Replit's frontend interface
+- Only start servers locally if explicitly requested by the user for debugging purposes
+
+## **Configuration**
+- **Vite and Express server configurations** must include Replit domain allowedHosts:
+  - Current domain: `db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev`
+  - Wildcard: `.replit.dev`
+  - Standard: `localhost`, `127.0.0.1`
+
+## **Environment Variables**
+- Use **Replit Secrets** for sensitive data like AWS credentials
+- Configure secrets in the Replit interface, not in local `.env` files
+- Backend environment variables should be accessible through Replit's environment
+
+## **Port Management**
+- **Default ports**: 
+  - Backend/Express: 5000 (as configured in server/index.ts)
+  - Frontend/Vite: 5173 (as configured in vite.config.ts)
+- Avoid port conflicts by ensuring only one instance runs at a time
+- Use `pkill -f tsx` or similar to clean up processes if needed
+
+## **File Operations**
+- Be cautious with file deletion commands
+- Always verify file paths before making changes
+- Use version control (git) to track changes on Replit
+
+## **Testing Approach**
+- User will test through Replit's hosted frontend
+- Focus on configuration fixes rather than local testing
+- Provide guidance for using Replit's built-in tools and console
