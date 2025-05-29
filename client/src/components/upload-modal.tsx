@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useUpload } from "@/hooks/use-upload";
 import { useDocuments } from "@/hooks/use-documents";
 import { useCarriers } from "@/hooks/use-carriers";
+import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, X, Check, AlertCircle, Calendar, Building2 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -28,6 +29,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
   const { uploadState, uploadFile, resetUpload } = useUpload();
   const { data: documents } = useDocuments();
   const { data: carriers, isLoading: carriersLoading } = useCarriers();
+  const { toast } = useToast();
 
   const sanitizeFileName = (fileName: string): string => {
     // Remove file extension
@@ -97,6 +99,15 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
   });
 
   const handleUpload = async () => {
+    if (!selectedCarrierId) {
+      toast({
+        title: "Carrier Required",
+        description: "You must select a carrier before uploading a document.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (selectedFile && documentType && selectedCarrierId) {
       const finalFileName = generateFileName(selectedFile.name, customFileName);
       await uploadFile(selectedFile, documentType, parseInt(selectedCarrierId), finalFileName);

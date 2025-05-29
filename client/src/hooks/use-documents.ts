@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 export function useDocuments() {
   return useQuery<Document[]>({
     queryKey: ["/api/documents"],
+    refetchInterval: 5000, // Poll every 5 seconds to check for status updates
   });
 }
 

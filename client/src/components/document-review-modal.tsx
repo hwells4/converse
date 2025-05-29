@@ -140,12 +140,19 @@ export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModal
                     </div>
                     <div>
                       <span className="font-medium text-gray-500">Uploaded:</span>
-                      <p className="text-gray-900">{format(new Date(document.uploadedAt), 'MMM d, yyyy HH:mm')}</p>
+                      <p className="text-gray-900">
+                        {document.uploadedAt 
+                          ? format(new Date(document.uploadedAt), 'MMM d, yyyy HH:mm')
+                          : 'Unknown'
+                        }
+                      </p>
                     </div>
                     {document.processedAt && (
                       <div>
                         <span className="font-medium text-gray-500">Processed:</span>
-                        <p className="text-gray-900">{format(new Date(document.processedAt), 'MMM d, yyyy HH:mm')}</p>
+                        <p className="text-gray-900">
+                          {format(new Date(document.processedAt), 'MMM d, yyyy HH:mm')}
+                        </p>
                       </div>
                     )}
                   </div>

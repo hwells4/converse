@@ -322,36 +322,21 @@ export default function Documents() {
                         {format(new Date(document.uploadedAt), "MMM dd, yyyy 'at' h:mm a")}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {(document.status === "processed" || document.status === "review_pending") && document.csvUrl ? (
+                        {document.csvUrl ? (
                           <div className="flex items-center space-x-1">
-                            {/* Primary Action Button */}
-                            {document.status === "review_pending" ? (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  console.log("Review button clicked for document:", document.id);
-                                  setSelectedDocumentId(null); // Clear CSV preview state
-                                  setReviewDocumentId(document.id);
-                                }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
-                              >
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Review
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  console.log("Preview button clicked for document:", document.id);
-                                  setSelectedDocumentId(null); // Clear CSV preview state
-                                  setReviewDocumentId(document.id);
-                                }}
-                                className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                Preview
-                              </Button>
-                            )}
+                            {/* Primary Action Button - Always show Review for documents with CSV */}
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                console.log("Review button clicked for document:", document.id, "status:", document.status);
+                                setSelectedDocumentId(null); // Clear CSV preview state
+                                setReviewDocumentId(document.id);
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Review
+                            </Button>
                             
                             {/* Dropdown Menu */}
                             <DropdownMenu>

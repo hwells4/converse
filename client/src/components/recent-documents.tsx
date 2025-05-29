@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { useDocuments, useDeleteDocument } from "@/hooks/use-documents";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVPreview } from "./csv-preview";
+import { DocumentReviewModal } from "./document-review-modal";
 import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink, ChevronDown, CheckCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -16,6 +17,7 @@ export function RecentDocuments() {
   const deleteDocument = useDeleteDocument();
   const { toast } = useToast();
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const [deletingDocumentId, setDeletingDocumentId] = useState<number | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean;
@@ -26,6 +28,26 @@ export function RecentDocuments() {
     documentId: null,
     documentName: "",
   });
+  
+  // Track previous document statuses to detect changes
+  const previousDocuments = useRef<Document[]>([]);
+  
+  // Check for status changes and show notifications
+  useEffect(() => {
+    if (documents && previousDocuments.current.length > 0) {
+      documents.forEach((currentDoc) => {
+        const previousDoc = previousDocuments.current.find(doc => doc.id === currentDoc.id);
+        if (previousDoc && previousDoc.status !== currentDoc.status && currentDoc.status === 'review_pending') {
+          toast({
+            title: "Document Processing Complete",
+            description: `${currentDoc.originalName || currentDoc.filename} is ready for review.`,
+            variant: "default",
+          });
+        }
+      });
+    }
+    previousDocuments.current = documents || [];
+  }, [documents, toast]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -162,7 +184,10 @@ export function RecentDocuments() {
           {document.status === "review_pending" ? (
             <Button
               size="sm"
-              onClick={() => setSelectedDocumentId(document.id)}
+              onClick={() => {
+                setSelectedDocumentId(document.id);
+                setShowReviewModal(true);
+              }}
               className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
             >
               <CheckCircle className="h-4 w-4 mr-1" />
@@ -171,7 +196,10 @@ export function RecentDocuments() {
           ) : (
             <Button
               size="sm"
-              onClick={() => setSelectedDocumentId(document.id)}
+              onClick={() => {
+                setSelectedDocumentId(document.id);
+                setShowReviewModal(false);
+              }}
               className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
             >
               <Eye className="h-4 w-4 mr-1" />
@@ -188,7 +216,10 @@ export function RecentDocuments() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
-                onClick={() => setSelectedDocumentId(document.id)}
+                onClick={() => {
+                  setSelectedDocumentId(document.id);
+                  setShowReviewModal(false);
+                }}
                 className="cursor-pointer"
               >
                 <Eye className="h-4 w-4 mr-2" />
@@ -243,11 +274,26 @@ export function RecentDocuments() {
     );
   };
 
-  if (selectedDocumentId) {
+  if (selectedDocumentId && showReviewModal) {
+    return (
+      <DocumentReviewModal 
+        documentId={selectedDocumentId} 
+        onClose={() => {
+          setSelectedDocumentId(null);
+          setShowReviewModal(false);
+        }} 
+      />
+    );
+  }
+
+  if (selectedDocumentId && !showReviewModal) {
     return (
       <CSVPreview 
         documentId={selectedDocumentId} 
-        onClose={() => setSelectedDocumentId(null)} 
+        onClose={() => {
+          setSelectedDocumentId(null);
+          setShowReviewModal(false);
+        }} 
       />
     );
   }
