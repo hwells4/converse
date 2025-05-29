@@ -13,11 +13,19 @@ import { useCarriers } from "@/hooks/use-carriers";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, FileText, X, Check, AlertCircle, Calendar, Building2 } from "lucide-react";
 import { format } from "date-fns";
+import * as XLSX from 'xlsx';
+import Papa from 'papaparse';
 
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   documentType: "commission" | "renewal" | null;
+}
+
+interface ParsedSpreadsheetData {
+  headers: string[];
+  rows: string[][];
+  detectedHeaderRow: number;
 }
 
 export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps) {
@@ -26,6 +34,9 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
   const [selectedCarrierId, setSelectedCarrierId] = useState<string>("");
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [duplicateDocument, setDuplicateDocument] = useState<any>(null);
+  const [parsedData, setParsedData] = useState<ParsedSpreadsheetData | null>(null);
+  const [selectedHeaderRow, setSelectedHeaderRow] = useState<number | null>(null);
+  const [fileType, setFileType] = useState<'pdf' | 'csv' | 'xlsx' | null>(null);
   const { uploadState, uploadFile, resetUpload } = useUpload();
   const { data: documents } = useDocuments();
   const { data: carriers, isLoading: carriersLoading } = useCarriers();
@@ -49,6 +60,87 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     return `${today}_${sanitizedOriginal}`;
   };
 
+  const detectFileType = (file: File): 'pdf' | 'csv' | 'xlsx' | null => {
+    if (file.type === "application/pdf") return 'pdf';
+    if (file.type === "text/csv" || file.name.toLowerCase().endsWith('.csv')) return 'csv';
+    if (file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || 
+        file.name.toLowerCase().endsWith('.xlsx')) return 'xlsx';
+    return null;
+  };
+
+  const detectHeaderRow = (rows: string[][]): number => {
+    // Simple heuristic: look for the first row with mostly non-empty, string values
+    // that seem like headers (no numbers, reasonable length)
+    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+      const row = rows[i];
+      if (row.length === 0) continue;
+      
+      const nonEmptyCount = row.filter(cell => cell && cell.trim()).length;
+      const stringCount = row.filter(cell => 
+        cell && cell.trim() && isNaN(Number(cell)) && cell.length > 1 && cell.length < 50
+      ).length;
+      
+      // If most cells are non-empty strings that look like headers
+      if (nonEmptyCount >= 3 && stringCount / nonEmptyCount >= 0.7) {
+        return i;
+      }
+    }
+    return 0; // Default to first row
+  };
+
+  const parseSpreadsheetFile = async (file: File): Promise<ParsedSpreadsheetData> => {
+    return new Promise((resolve, reject) => {
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        Papa.parse(file, {
+          complete: (results) => {
+            const rows = results.data as string[][];
+            const detectedHeaderRow = detectHeaderRow(rows);
+            const headers = rows[detectedHeaderRow] || [];
+            const dataRows = rows.slice(detectedHeaderRow + 1).filter(row => 
+              row.some(cell => cell && cell.trim())
+            );
+            
+            resolve({
+              headers,
+              rows: dataRows,
+              detectedHeaderRow
+            });
+          },
+          error: (error) => reject(error)
+        });
+      } else if (file.name.toLowerCase().endsWith('.xlsx')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            const rows = jsonData as string[][];
+            
+            const detectedHeaderRow = detectHeaderRow(rows);
+            const headers = rows[detectedHeaderRow] || [];
+            const dataRows = rows.slice(detectedHeaderRow + 1).filter(row => 
+              row.some(cell => cell && cell.toString().trim())
+            );
+            
+            resolve({
+              headers: headers.map(h => h?.toString() || ''),
+              rows: dataRows.map(row => row.map(cell => cell?.toString() || '')),
+              detectedHeaderRow
+            });
+          } catch (error) {
+            reject(error);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } else {
+        reject(new Error('Unsupported file type'));
+      }
+    });
+  };
+
   const checkForDuplicates = (file: File) => {
     if (!documents) return false;
     
@@ -65,34 +157,65 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     return false;
   };
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       const file = acceptedFiles[0];
+      const detectedFileType = detectFileType(file);
       
       // Validate file type
-      if (file.type !== "application/pdf") {
+      if (!detectedFileType) {
+        toast({
+          title: "Unsupported File Type",
+          description: "Please upload a PDF, CSV, or XLSX file.",
+          variant: "destructive",
+        });
         return;
       }
 
       // Validate file size (50MB)
       if (file.size > 50 * 1024 * 1024) {
+        toast({
+          title: "File Too Large",
+          description: "File size must be less than 50MB.",
+          variant: "destructive",
+        });
         return;
+      }
+
+      setFileType(detectedFileType);
+      setSelectedFile(file);
+
+      // For CSV/XLSX files, parse immediately
+      if (detectedFileType === 'csv' || detectedFileType === 'xlsx') {
+        try {
+          const parsed = await parseSpreadsheetFile(file);
+          setParsedData(parsed);
+          setSelectedHeaderRow(parsed.detectedHeaderRow);
+        } catch (error) {
+          toast({
+            title: "File Parse Error",
+            description: "Unable to parse the spreadsheet file. Please check the file format.",
+            variant: "destructive",
+          });
+          setSelectedFile(null);
+          setFileType(null);
+          return;
+        }
       }
 
       // Check for duplicates
       if (checkForDuplicates(file)) {
         setShowDuplicateWarning(true);
-        setSelectedFile(file);
-      } else {
-        setSelectedFile(file);
       }
     }
-  }, [documents, customFileName]);
+  }, [documents, customFileName, toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       "application/pdf": [".pdf"],
+      "text/csv": [".csv"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
     },
     maxFiles: 1,
     maxSize: 50 * 1024 * 1024,
@@ -110,8 +233,34 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     
     if (selectedFile && documentType && selectedCarrierId) {
       const finalFileName = generateFileName(selectedFile.name, customFileName);
-      await uploadFile(selectedFile, documentType, parseInt(selectedCarrierId), finalFileName);
+      
+      // For CSV/XLSX files, we'll need to handle differently
+      if (fileType === 'csv' || fileType === 'xlsx') {
+        // Skip AWS upload for CSV/XLSX and go directly to field mapping
+        await handleSpreadsheetUpload();
+      } else {
+        // PDF files go through the normal AWS flow
+        await uploadFile(selectedFile, documentType, parseInt(selectedCarrierId), finalFileName);
+      }
     }
+  };
+
+  const handleSpreadsheetUpload = async () => {
+    if (!parsedData || selectedHeaderRow === null) return;
+    
+    // Create document record with spreadsheet data
+    const finalFileName = generateFileName(selectedFile!.name, customFileName);
+    // TODO: We'll need to modify the backend to handle spreadsheet data directly
+    // For now, we'll store the parsed data in a way that can be processed
+    console.log("Spreadsheet data ready for field mapping:", {
+      headers: parsedData.headers,
+      rows: parsedData.rows,
+      fileName: finalFileName,
+      carrierId: selectedCarrierId
+    });
+    
+    // Close modal and proceed to field mapping
+    handleClose();
   };
 
   const handleDuplicateConfirm = async () => {
@@ -134,6 +283,9 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     setSelectedCarrierId("");
     setShowDuplicateWarning(false);
     setDuplicateDocument(null);
+    setParsedData(null);
+    setSelectedHeaderRow(null);
+    setFileType(null);
     resetUpload();
     onClose();
   };
