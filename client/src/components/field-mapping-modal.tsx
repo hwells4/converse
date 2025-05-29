@@ -315,10 +315,14 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">Review & Edit Your Data</h3>
-                    <p className="text-sm text-gray-600">
-                      Double-check the data below and feel free to adjust anything that looks incorrect. 
-                      This preview shows the first 5 rows - the same structure will be applied to all {csvData?.rows?.length || 0} rows when uploaded to Salesforce.
-                    </p>
+                    <div className="space-y-2">
+                      <p className="text-sm text-gray-600">
+                        Review and edit your data below. All {editablePreviewData.length} rows will be uploaded to Salesforce.
+                      </p>
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <p>• Click any cell to edit • Add missing rows • Remove unnecessary data • All changes auto-save</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -327,7 +331,7 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
                 <div className="p-6">
                   {editablePreviewData.length > 0 ? (
                     <div className="space-y-4">
-                      {/* Summary Stats & Controls */}
+                      {/* Summary Stats */}
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <div className="flex items-center justify-between">
                           <div>
@@ -336,18 +340,8 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
                               {editablePreviewData.length} rows • {Object.keys(editablePreviewData[0]).length} mapped fields
                             </p>
                           </div>
-                          <div className="flex items-center space-x-3">
-                            <Button
-                              onClick={handleAddRow}
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              <Plus className="h-4 w-4 mr-1" />
-                              Add Row
-                            </Button>
-                            <div className="text-sm text-blue-600">
-                              Click any cell to edit
-                            </div>
+                          <div className="text-sm text-blue-600">
+                            Scroll down to see all data
                           </div>
                         </div>
                       </div>
@@ -365,8 +359,8 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
                                   {fieldName}
                                 </th>
                               ))}
-                              <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 w-16">
-                                Actions
+                              <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 w-8">
+                                
                               </th>
                             </tr>
                           </thead>
@@ -387,15 +381,15 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
                                     />
                                   </td>
                                 ))}
-                                <td className="px-2 py-1 text-center border-r-0">
+                                <td className="px-1 py-1 text-center border-r-0">
                                   <Button
                                     onClick={() => handleRemoveRow(rowIndex)}
                                     size="sm"
                                     variant="ghost"
-                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    className="h-4 w-4 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
                                     title="Delete this row"
                                   >
-                                    <Trash2 className="h-3 w-3" />
+                                    <Trash2 className="h-2.5 w-2.5" />
                                   </Button>
                                 </td>
                               </tr>
@@ -404,22 +398,17 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
                         </table>
                       </div>
 
-                      {/* Edit Instructions */}
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                        <div className="flex items-start space-x-2">
-                          <div className="text-yellow-600 mt-0.5">💡</div>
-                          <div>
-                            <h4 className="font-medium text-yellow-900 mb-1">Pro Tips</h4>
-                            <ul className="text-sm text-yellow-800 space-y-1">
-                              <li>• Click any cell to edit its value</li>
-                              <li>• Use "Add Row" button to add missing data the parser didn't catch</li>
-                              <li>• Click the trash icon to remove unnecessary rows</li>
-                              <li>• Empty cells will be uploaded as blank values</li>
-                              <li>• Changes are automatically saved as you type</li>
-                              <li>• This preview shows all {editablePreviewData.length} rows that will be uploaded</li>
-                            </ul>
-                          </div>
-                        </div>
+                      {/* Add Row Button */}
+                      <div className="flex justify-center pt-2">
+                        <Button
+                          onClick={handleAddRow}
+                          variant="outline"
+                          size="sm"
+                          className="border-green-300 text-green-700 hover:bg-green-50 hover:border-green-400"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Row
+                        </Button>
                       </div>
                     </div>
                   ) : (
