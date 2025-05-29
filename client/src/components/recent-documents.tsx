@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVPreview } from "./csv-preview";
-import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink } from "lucide-react";
+import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink, ChevronDown, CheckCircle } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -154,78 +155,90 @@ export function RecentDocuments() {
     );
 
     // Actions based on document status
-    if (document.status === "review_pending") {
+    if ((document.status === "processed" || document.status === "review_pending") && document.csvUrl) {
       return (
-        <div className="flex space-x-2">
-          <Link href={`/review/${document.id}`}>
+        <div className="flex items-center space-x-1">
+          {/* Primary Action Button */}
+          {document.status === "review_pending" ? (
             <Button
-              variant="ghost"
               size="sm"
-              className="text-blue-600 hover:text-blue-700 h-8 px-2"
+              onClick={() => setSelectedDocumentId(document.id)}
+              className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
             >
-              <ExternalLink className="h-4 w-4 mr-1" />
+              <CheckCircle className="h-4 w-4 mr-1" />
               Review
             </Button>
-          </Link>
-          {document.csvUrl && (
+          ) : (
             <Button
-              variant="ghost"
               size="sm"
-              onClick={() => handleDownloadCSV(document.csvUrl!, document.originalName)}
-              className="text-green-600 hover:text-green-700 h-8 px-2"
+              onClick={() => setSelectedDocumentId(document.id)}
+              className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
             >
-              <Download className="h-4 w-4 mr-1" />
-              CSV
+              <Eye className="h-4 w-4 mr-1" />
+              Preview
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedDocumentId(document.id)}
-            className="text-gray-600 hover:text-gray-800 h-8 px-2"
-          >
-            <Eye className="h-4 w-4 mr-1" />
-            Preview
-          </Button>
-          {deleteButton}
-        </div>
-      );
-    }
-
-    if (document.status === "processed" && document.csvUrl) {
-      return (
-        <div className="flex space-x-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDownloadCSV(document.csvUrl!, document.originalName)}
-            className="text-blue-600 hover:text-blue-700 h-8 px-2"
-          >
-            <Download className="h-4 w-4 mr-1" />
-            Download CSV
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedDocumentId(document.id)}
-            className="text-gray-600 hover:text-gray-800 h-8 px-2"
-          >
-            <Eye className="h-4 w-4 mr-1" />
-            View
-          </Button>
-          {deleteButton}
+          
+          {/* Dropdown Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => setSelectedDocumentId(document.id)}
+                className="cursor-pointer"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                View CSV Preview
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleDownloadCSV(document.csvUrl!, document.originalName)}
+                className="cursor-pointer"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleDeleteDocument(document.id, document.originalName)}
+                disabled={deletingDocumentId === document.id}
+                className="cursor-pointer text-red-600 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {deletingDocumentId === document.id ? "Deleting..." : "Delete"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       );
     }
 
     // For processing, failed, or uploaded documents
     return (
-      <div className="flex space-x-2">
+      <div className="flex items-center space-x-1">
         <span className="text-gray-400 text-sm">
           {document.status === "processing" ? "Processing..." : 
            document.status === "failed" ? "Processing failed" : "Not available"}
         </span>
-        {deleteButton}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => handleDeleteDocument(document.id, document.originalName)}
+              disabled={deletingDocumentId === document.id}
+              className="cursor-pointer text-red-600 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              {deletingDocumentId === document.id ? "Deleting..." : "Delete"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     );
   };
