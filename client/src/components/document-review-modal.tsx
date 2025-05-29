@@ -3,9 +3,10 @@ import { useDocument, useDocumentProcessedData, useDocumentProcessedCSVData } fr
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { X, FileText, AlertCircle, CheckCircle, Edit3, Download, ToggleLeft, ToggleRight } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { X, FileText, AlertCircle, CheckCircle, Edit3, Download, ChevronRight, ArrowRight, ArrowDown } from "lucide-react";
 import { format } from "date-fns";
 
 interface DocumentReviewModalProps {
@@ -18,12 +19,18 @@ interface TableData {
   rows: Array<Array<{ value: string; confidence?: number }>>;
 }
 
+interface RowSelection {
+  [rowIndex: number]: boolean;
+}
+
 export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModalProps) {
   const { data: document, isLoading: documentLoading } = useDocument(documentId);
   const { data: processedData, isLoading: dataLoading, error: dataError } = useDocumentProcessedData(documentId);
   const { data: csvData, isLoading: csvLoading, error: csvError } = useDocumentProcessedCSVData(documentId);
   const [tableData, setTableData] = useState<TableData | null>(null);
   const [viewMode, setViewMode] = useState<'json' | 'csv'>('json');
+  const [selectedRows, setSelectedRows] = useState<RowSelection>({});
+  const [selectAll, setSelectAll] = useState(false);
 
   useEffect(() => {
     const currentData = viewMode === 'csv' ? csvData : processedData;
@@ -119,6 +126,38 @@ export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModal
       setTableData(null);
     }
   }, [processedData, csvData, viewMode]);
+
+  // Reset selection when data changes
+  useEffect(() => {
+    setSelectedRows({});
+    setSelectAll(false);
+  }, [tableData]);
+
+  // Handle row selection
+  const handleRowSelect = (rowIndex: number, checked: boolean) => {
+    setSelectedRows(prev => ({
+      ...prev,
+      [rowIndex]: checked
+    }));
+  };
+
+  // Handle select all
+  const handleSelectAll = (checked: boolean) => {
+    setSelectAll(checked);
+    if (!tableData) return;
+    
+    const newSelection: RowSelection = {};
+    if (checked) {
+      tableData.rows.forEach((_, index) => {
+        newSelection[index] = true;
+      });
+    }
+    setSelectedRows(newSelection);
+  };
+
+  // Get selected row count
+  const selectedCount = Object.values(selectedRows).filter(Boolean).length;
+  const totalRows = tableData?.rows.length || 0;
 
   const getConfidenceColor = (confidence?: number) => {
     if (!confidence || confidence === 0) return '';
@@ -297,35 +336,108 @@ export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModal
                       </div>
                     </div>
                   ) : tableData ? (
-                    <div className="overflow-auto h-full border rounded-lg">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            {tableData.headers.map((header, index) => (
-                              <TableHead key={index} className="font-semibold bg-gray-50">
-                                {header}
-                              </TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {tableData.rows.map((row, rowIndex) => (
-                            <TableRow key={rowIndex}>
-                              {row.map((cell, cellIndex) => (
-                                <TableCell 
-                                  key={cellIndex}
-                                  className={`${getConfidenceColor(cell.confidence)} relative`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span>{cell.value}</span>
-                                    {getConfidenceBadge(cell.confidence)}
+                    <div className="h-full flex flex-col">
+                      {/* Selection Controls */}
+                      <div className="flex items-center justify-between p-3 bg-gray-50 border-b">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              checked={selectAll}
+                              onCheckedChange={handleSelectAll}
+                              id="select-all"
+                            />
+                            <label htmlFor="select-all" className="text-sm font-medium text-gray-700 cursor-pointer">
+                              Select All
+                            </label>
+                          </div>
+                          <span className="text-sm text-gray-600">
+                            {selectedCount} of {totalRows} rows selected
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2 text-xs text-gray-500">
+                          <ArrowRight className="h-3 w-3" />
+                          <span>Scroll right for more columns</span>
+                          <ArrowDown className="h-3 w-3 ml-4" />
+                          <span>Scroll down for more rows</span>
+                        </div>
+                      </div>
+
+                      {/* Table Container */}
+                      <div className="flex-1 relative">
+                        <ScrollArea className="h-full w-full">
+                          <div className="min-w-full">
+                            {/* Header */}
+                            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+                              <div className="flex">
+                                {/* Selection column */}
+                                <div className="w-12 flex-shrink-0 p-2 bg-gray-50 border-r border-gray-200">
+                                  <div className="h-8 flex items-center justify-center">
+                                    <span className="text-xs font-medium text-gray-500">#</span>
                                   </div>
-                                </TableCell>
+                                </div>
+                                
+                                {/* Data columns */}
+                                {tableData.headers.map((header, index) => (
+                                  <div 
+                                    key={index}
+                                    className="min-w-[120px] max-w-[250px] flex-shrink-0 p-2 bg-gray-50 border-r border-gray-200 last:border-r-0"
+                                  >
+                                    <div className="h-8 flex items-center">
+                                      <span className="text-xs font-semibold text-gray-700 truncate" title={header}>
+                                        {header}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Rows */}
+                            <div className="divide-y divide-gray-100">
+                              {tableData.rows.map((row, rowIndex) => (
+                                <div 
+                                  key={rowIndex}
+                                  className={`flex hover:bg-gray-50 transition-colors ${
+                                    selectedRows[rowIndex] ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
+                                  }`}
+                                >
+                                  {/* Selection column */}
+                                  <div className="w-12 flex-shrink-0 p-2 border-r border-gray-200">
+                                    <div className="h-8 flex items-center justify-center">
+                                      <Checkbox
+                                        checked={selectedRows[rowIndex] || false}
+                                        onCheckedChange={(checked) => handleRowSelect(rowIndex, checked as boolean)}
+                                        className="scale-90"
+                                      />
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Data columns */}
+                                  {row.map((cell, cellIndex) => (
+                                    <div 
+                                      key={cellIndex}
+                                      className={`min-w-[120px] max-w-[250px] flex-shrink-0 p-2 border-r border-gray-200 last:border-r-0 ${
+                                        getConfidenceColor(cell.confidence)
+                                      }`}
+                                    >
+                                      <div className="h-8 flex items-center justify-between">
+                                        <span 
+                                          className="text-sm text-gray-900 truncate mr-1" 
+                                          title={cell.value}
+                                        >
+                                          {cell.value}
+                                        </span>
+                                        {getConfidenceBadge(cell.confidence)}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
                               ))}
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                            </div>
+                          </div>
+                        </ScrollArea>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-64">
@@ -345,18 +457,41 @@ export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModal
         {/* Footer */}
         <div className="border-t border-gray-200 p-6">
           <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-500">
-              {tableData && (
-                <span>{tableData.rows.length} rows • {tableData.headers.length} columns</span>
+            <div className="flex items-center space-x-6">
+              <div className="text-sm text-gray-500">
+                {tableData && (
+                  <span>{tableData.rows.length} rows • {tableData.headers.length} columns</span>
+                )}
+              </div>
+              {selectedCount > 0 && (
+                <div className="flex items-center space-x-2 text-sm">
+                  <span className="text-blue-600 font-medium">{selectedCount} rows selected</span>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      setSelectedRows({});
+                      setSelectAll(false);
+                    }}
+                  >
+                    Clear Selection
+                  </Button>
+                </div>
               )}
             </div>
             <div className="flex items-center space-x-3">
               <Button variant="outline" onClick={onClose}>
                 Close
               </Button>
-              <Button className="bg-blue-600 hover:bg-blue-700">
-                Continue to Review
-              </Button>
+              {selectedCount > 0 ? (
+                <Button className="bg-green-600 hover:bg-green-700">
+                  Approve {selectedCount} Row{selectedCount === 1 ? '' : 's'}
+                </Button>
+              ) : (
+                <Button className="bg-blue-600 hover:bg-blue-700">
+                  Review All Data
+                </Button>
+              )}
             </div>
           </div>
         </div>
