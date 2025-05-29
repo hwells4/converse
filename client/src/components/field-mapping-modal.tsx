@@ -56,8 +56,8 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
         // Get first 3 non-empty sample values for this column
         const sampleValues = csvData.rows
           .slice(0, 10) // Look at first 10 rows
-          .map(row => row[index]?.value || '')
-          .filter(value => value.trim() !== '')
+          .map((row: any) => row[index]?.value || '')
+          .filter((value: string) => value.trim() !== '')
           .slice(0, 3);
 
         return {
@@ -94,7 +94,7 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
   // Generate preview data based on current mapping
   useEffect(() => {
     if (csvData && csvData.rows && Object.keys(fieldMapping).length > 0) {
-      const mappedData = csvData.rows.slice(0, 5).map(row => {
+      const mappedData = csvData.rows.slice(0, 5).map((row: any) => {
         const mappedRow: any = {};
         Object.entries(fieldMapping).forEach(([columnIndex, salesforceField]) => {
           if (salesforceField !== 'skip') {
