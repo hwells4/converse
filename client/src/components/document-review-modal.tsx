@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { useDocument, useDocumentProcessedData } from "@/hooks/use-documents";
+import { useDocument, useDocumentProcessedData, useDocumentProcessedCSVData } from "@/hooks/use-documents";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { X, FileText, AlertCircle, CheckCircle, Edit3, Download } from "lucide-react";
+import { X, FileText, AlertCircle, CheckCircle, Edit3, Download, ToggleLeft, ToggleRight } from "lucide-react";
 import { format } from "date-fns";
 
 interface DocumentReviewModalProps {
@@ -21,44 +21,122 @@ interface TableData {
 export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModalProps) {
   const { data: document, isLoading: documentLoading } = useDocument(documentId);
   const { data: processedData, isLoading: dataLoading, error: dataError } = useDocumentProcessedData(documentId);
+  const { data: csvData, isLoading: csvLoading, error: csvError } = useDocumentProcessedCSVData(documentId);
   const [tableData, setTableData] = useState<TableData | null>(null);
+  const [viewMode, setViewMode] = useState<'json' | 'csv'>('json');
 
   useEffect(() => {
-    if (processedData) {
-      // Parse the processed JSON data into table format
-      // This will depend on the actual structure from your Lambda
-      // For now, assuming a structure like: { headers: string[], rows: Array<Array<{value: string, confidence?: number}>> }
-      if (processedData.headers && processedData.rows) {
-        setTableData(processedData);
-      } else if (Array.isArray(processedData) && processedData.length > 0) {
-        // If it's an array of objects, convert to table format
-        const headers = Object.keys(processedData[0]);
-        const rows = processedData.map(row => 
-          headers.map(header => ({
-            value: row[header]?.toString() || '',
-            confidence: row[`${header}_confidence`] || undefined
-          }))
-        );
-        setTableData({ headers, rows });
+    const currentData = viewMode === 'csv' ? csvData : processedData;
+    
+    if (currentData) {
+      console.log(`Processing ${viewMode} data:`, currentData);
+      console.log("Data type:", typeof currentData);
+      console.log("Data keys:", Object.keys(currentData));
+      
+      // Handle CSV data (already in the right format)
+      if (viewMode === 'csv' && currentData.headers && currentData.rows) {
+        console.log("Using CSV data format");
+        setTableData(currentData);
+        return;
       }
+      
+      // Handle JSON data (original logic)
+      if (viewMode === 'json') {
+        // NEW APPROACH: Use tables from JSON to create a clean CSV-like display
+        if (currentData.tables && Array.isArray(currentData.tables) && currentData.tables.length > 0) {
+          console.log("Found tables:", currentData.tables.length);
+          
+          const firstTable = currentData.tables[0];
+          console.log("First table:", firstTable);
+          
+          if (firstTable.rows && Array.isArray(firstTable.rows) && firstTable.rows.length > 0) {
+            console.log("Table has rows:", firstTable.rows.length);
+            
+            // Extract headers from the first row
+            const firstRow = firstTable.rows[0];
+            const headers = firstRow?.cells?.map((cell: any) => cell.text || '') || [];
+            
+            // Convert all remaining rows to clean data (no confidence in separate columns)
+            const rows = firstTable.rows.slice(1).map((row: any) => 
+              row.cells?.map((cell: any) => ({
+                value: cell.text || '',
+                confidence: cell.confidence || 0 // Keep confidence but don't display it separately
+              })) || []
+            );
+            
+            console.log("Extracted headers:", headers);
+            console.log("Converted rows:", rows.length);
+            setTableData({ headers, rows });
+            return;
+          }
+        } else if (currentData.keyValuePairs && Array.isArray(currentData.keyValuePairs) && currentData.keyValuePairs.length > 0) {
+          console.log("Found key-value pairs:", currentData.keyValuePairs.length);
+          // Clean key-value display
+          const headers = ['Key', 'Value'];
+          const rows = currentData.keyValuePairs.map((pair: any) => [
+            { value: pair.key || '', confidence: pair.keyConfidence || 0 },
+            { value: pair.value || '', confidence: pair.valueConfidence || 0 }
+          ]);
+          
+          setTableData({ headers, rows });
+          return;
+        } else if (currentData.rawLines && Array.isArray(currentData.rawLines) && currentData.rawLines.length > 0) {
+          console.log("Found raw lines:", currentData.rawLines.length);
+          // Clean lines display
+          const headers = ['Text', 'Page'];
+          const rows = currentData.rawLines.map((line: any) => [
+            { value: line.text || '', confidence: line.confidence || 0 },
+            { value: line.pageNumber?.toString() || '', confidence: 100 }
+          ]);
+          
+          setTableData({ headers, rows });
+          return;
+        } else {
+          // Fallback: try the original logic for backwards compatibility
+          if (currentData.headers && currentData.rows) {
+            console.log("Using fallback: headers and rows format");
+            setTableData(currentData);
+            return;
+          } else if (Array.isArray(currentData) && currentData.length > 0) {
+            console.log("Using fallback: array of objects format");
+            const headers = Object.keys(currentData[0]);
+            const rows = currentData.map(row => 
+              headers.map(header => ({
+                value: row[header]?.toString() || '',
+                confidence: row[`${header}_confidence`] || 0
+              }))
+            );
+            setTableData({ headers, rows });
+            return;
+          }
+        }
+      }
+      
+      console.log("No processable data found in:", currentData);
+      setTableData(null);
+    } else {
+      console.log(`No ${viewMode} data available`);
+      setTableData(null);
     }
-  }, [processedData]);
+  }, [processedData, csvData, viewMode]);
 
   const getConfidenceColor = (confidence?: number) => {
-    if (!confidence) return '';
-    if (confidence >= 0.9) return 'bg-green-50 border-green-200';
-    if (confidence >= 0.7) return 'bg-yellow-50 border-yellow-200';
+    if (!confidence || confidence === 0) return '';
+    // Confidence is already in 0-100 range from Lambda
+    if (confidence >= 90) return 'bg-green-50 border-green-200';
+    if (confidence >= 70) return 'bg-yellow-50 border-yellow-200';
     return 'bg-red-50 border-red-200';
   };
 
   const getConfidenceBadge = (confidence?: number) => {
-    if (!confidence) return null;
+    if (!confidence || confidence === 0 || confidence === 100) return null;
     
-    const percentage = Math.round(confidence * 100);
-    if (confidence >= 0.9) {
+    // Confidence is already in 0-100 range from Lambda
+    const percentage = Math.round(confidence);
+    if (confidence >= 90) {
       return <Badge className="bg-green-100 text-green-800 text-xs ml-2">{percentage}%</Badge>;
     }
-    if (confidence >= 0.7) {
+    if (confidence >= 70) {
       return <Badge className="bg-yellow-100 text-yellow-800 text-xs ml-2">{percentage}%</Badge>;
     }
     return <Badge className="bg-red-100 text-red-800 text-xs ml-2">{percentage}%</Badge>;
@@ -165,6 +243,27 @@ export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModal
                   <CardTitle className="flex items-center justify-between">
                     <span>Extracted Data</span>
                     <div className="flex items-center space-x-2">
+                      {/* View Mode Toggle */}
+                      <div className="flex items-center space-x-2 mr-4">
+                        <span className="text-sm text-gray-600">View:</span>
+                        <Button
+                          variant={viewMode === 'json' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setViewMode('json')}
+                          className="text-xs"
+                        >
+                          JSON
+                        </Button>
+                        <Button
+                          variant={viewMode === 'csv' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setViewMode('csv')}
+                          className="text-xs"
+                        >
+                          CSV
+                        </Button>
+                      </div>
+                      
                       <Button variant="outline" size="sm">
                         <Edit3 className="h-4 w-4 mr-2" />
                         Edit Data
@@ -179,13 +278,13 @@ export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModal
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1 overflow-hidden">
-                  {dataLoading ? (
+                  {(viewMode === 'json' ? dataLoading : csvLoading) ? (
                     <div className="space-y-3">
                       {[...Array(5)].map((_, i) => (
                         <Skeleton key={i} className="h-12 w-full" />
                       ))}
                     </div>
-                  ) : dataError ? (
+                  ) : (viewMode === 'json' ? dataError : csvError) ? (
                     <div className="flex items-center justify-center h-64">
                       <div className="text-center">
                         <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -193,7 +292,7 @@ export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModal
                         <p className="text-gray-600">
                           {document.status === 'processing' 
                             ? 'Document is still being processed. Please check back later.'
-                            : 'Processed data could not be loaded.'}
+                            : `Processed ${viewMode.toUpperCase()} data could not be loaded.`}
                         </p>
                       </div>
                     </div>

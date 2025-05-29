@@ -130,26 +130,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/documents/:id/processed-json", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      console.log(`🔵 Fetching processed JSON for document ID: ${id}`);
+      
       const document = await storage.getDocument(id);
+      console.log(`📄 Document found:`, {
+        id: document?.id,
+        filename: document?.filename,
+        status: document?.status,
+        jsonS3Key: document?.jsonS3Key,
+        csvS3Key: document?.csvS3Key
+      });
       
       if (!document) {
+        console.log(`❌ Document ${id} not found`);
         return res.status(404).json({ message: "Document not found" });
       }
 
       if (!document.jsonS3Key) {
+        console.log(`❌ Document ${id} has no jsonS3Key`);
         return res.status(404).json({ message: "Processed JSON not available" });
       }
 
       if (!BackendAWSService.isConfigured()) {
+        console.log(`❌ AWS credentials not configured`);
         return res.status(500).json({ message: "AWS credentials not configured" });
       }
 
+      console.log(`☁️ Downloading JSON from S3 key: ${document.jsonS3Key}`);
       const jsonContent = await BackendAWSService.downloadFromS3(document.jsonS3Key);
+      console.log(`📥 Downloaded JSON content length: ${jsonContent.length} characters`);
+      console.log(`📥 JSON content preview (first 200 chars): ${jsonContent.substring(0, 200)}...`);
+      
       const parsedData = JSON.parse(jsonContent);
+      console.log(`✅ JSON parsed successfully. Keys:`, Object.keys(parsedData));
+      console.log(`✅ Tables count:`, parsedData.tables?.length || 0);
+      console.log(`✅ Key-value pairs count:`, parsedData.keyValuePairs?.length || 0);
+      console.log(`✅ Raw lines count:`, parsedData.rawLines?.length || 0);
 
       res.json(parsedData);
     } catch (error) {
-      console.error("JSON download error:", error);
+      console.error("💥 JSON download error:", error);
+      console.error("💥 Error stack:", error instanceof Error ? error.stack : 'No stack trace');
       res.status(500).json({ message: "Failed to fetch processed data" });
     }
   });
@@ -180,6 +201,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("CSV download error:", error);
       res.status(500).json({ message: "Failed to download CSV file" });
+    }
+  });
+
+  // Get processed CSV data as JSON for display
+  app.get("/api/documents/:id/processed-csv-data", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      console.log(`🔵 Fetching processed CSV data for document ID: ${id}`);
+      
+      const document = await storage.getDocument(id);
+      console.log(`📄 Document found:`, {
+        id: document?.id,
+        filename: document?.filename,
+        status: document?.status,
+        csvS3Key: document?.csvS3Key
+      });
+      
+      if (!document) {
+        console.log(`❌ Document ${id} not found`);
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      if (!document.csvS3Key) {
+        console.log(`❌ Document ${id} has no csvS3Key`);
+        return res.status(404).json({ message: "Processed CSV not available" });
+      }
+
+      if (!BackendAWSService.isConfigured()) {
+        console.log(`❌ AWS credentials not configured`);
+        return res.status(500).json({ message: "AWS credentials not configured" });
+      }
+
+      console.log(`☁️ Downloading CSV from S3 key: ${document.csvS3Key}`);
+      const csvContent = await BackendAWSService.downloadFromS3(document.csvS3Key);
+      console.log(`📥 Downloaded CSV content length: ${csvContent.length} characters`);
+      
+      // Parse CSV content into JSON
+      const lines = csvContent.split('\n').filter(line => line.trim());
+      if (lines.length === 0) {
+        return res.json({ headers: [], rows: [] });
+      }
+      
+      // Parse CSV manually (simple approach)
+      const parseCSVLine = (line: string) => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+      
+      const headers = parseCSVLine(lines[0]);
+      const rows = lines.slice(1).map(line => {
+        const values = parseCSVLine(line);
+        return values.map(value => ({
+          value: value.replace(/^"|"$/g, ''), // Remove surrounding quotes
+          confidence: 100 // CSV doesn't have confidence scores
+        }));
+      });
+      
+      console.log(`✅ CSV parsed successfully. Headers:`, headers);
+      console.log(`✅ Rows count:`, rows.length);
+
+      res.json({ headers, rows });
+    } catch (error) {
+      console.error("💥 CSV data fetch error:", error);
+      console.error("💥 Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ message: "Failed to fetch CSV data" });
     }
   });
 
@@ -217,14 +318,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/documents/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      console.log(`🔵 Fetching document ID: ${id}`);
+      
       const document = await storage.getDocument(id);
+      console.log(`📄 Document retrieved:`, {
+        id: document?.id,
+        filename: document?.filename,
+        status: document?.status,
+        jsonS3Key: document?.jsonS3Key,
+        csvS3Key: document?.csvS3Key,
+        textractJobId: document?.textractJobId,
+        processedAt: document?.processedAt
+      });
       
       if (!document) {
+        console.log(`❌ Document ${id} not found`);
         return res.status(404).json({ message: "Document not found" });
       }
       
       res.json(document);
     } catch (error) {
+      console.error("💥 Failed to fetch document:", error);
       res.status(500).json({ message: "Failed to fetch document" });
     }
   });
@@ -550,10 +664,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         textractJobId: `test-job-${Date.now()}`,
         status: simulateStatus,
         ...(simulateStatus === "processed" ? {
-          jsonS3Key: `processed/${s3Key.replace('.pdf', '.json')}`,
-          jsonUrl: `https://s3.amazonaws.com/bucket/processed/${s3Key.replace('.pdf', '.json')}`,
-          csvS3Key: `processed/${s3Key.replace('.pdf', '.csv')}`,
-          csvUrl: `https://s3.amazonaws.com/bucket/processed/${s3Key.replace('.pdf', '.csv')}`,
+          jsonS3Key: `processed/${s3Key.replace('uploads/', '').replace('.pdf', '.json')}`,
+          jsonUrl: `https://s3.amazonaws.com/bucket/processed/${s3Key.replace('uploads/', '').replace('.pdf', '.json')}`,
+          csvS3Key: `processed/${s3Key.replace('uploads/', '').replace('.pdf', '.csv')}`,
+          csvUrl: `https://s3.amazonaws.com/bucket/processed/${s3Key.replace('uploads/', '').replace('.pdf', '.csv')}`,
         } : {
           errorMessage: "Simulated processing failure for testing"
         })

@@ -20,11 +20,29 @@ export function useDocumentProcessedData(id: number) {
   return useQuery<any>({
     queryKey: ["/api/documents", id, "processed-json"],
     queryFn: async () => {
+      console.log(`Fetching processed data for document ${id}`);
       const response = await apiRequest("GET", `/api/documents/${id}/processed-json`);
-      return response.json();
+      const data = await response.json();
+      console.log(`Received processed data for document ${id}:`, data);
+      return data;
     },
     enabled: !!id,
     retry: false, // Don't retry if the processed data isn't available yet
+  });
+}
+
+export function useDocumentProcessedCSVData(id: number) {
+  return useQuery<any>({
+    queryKey: ["/api/documents", id, "processed-csv-data"],
+    queryFn: async () => {
+      console.log(`Fetching processed CSV data for document ${id}`);
+      const response = await apiRequest("GET", `/api/documents/${id}/processed-csv-data`);
+      const data = await response.json();
+      console.log(`Received processed CSV data for document ${id}:`, data);
+      return data;
+    },
+    enabled: !!id,
+    retry: false,
   });
 }
 
