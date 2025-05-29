@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVPreview } from "./csv-preview";
-import { DocumentReviewModal } from "./document-review-modal";
+// import { FieldMappingModal } from "./field-mapping-modal";
 import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink, ChevronDown, CheckCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -276,7 +276,7 @@ export function RecentDocuments() {
 
   if (selectedDocumentId && showReviewModal) {
     return (
-      <DocumentReviewModal 
+      <FieldMappingModal 
         documentId={selectedDocumentId} 
         onClose={() => {
           setSelectedDocumentId(null);
