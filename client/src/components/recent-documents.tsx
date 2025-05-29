@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVPreview } from "./csv-preview";
-// import { FieldMappingModal } from "./field-mapping-modal";
+import { FieldMappingModal } from "./field-mapping-modal";
 import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink, ChevronDown, CheckCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -274,18 +274,17 @@ export function RecentDocuments() {
     );
   };
 
-  // Temporarily disabled field mapping modal
-  // if (selectedDocumentId && showReviewModal) {
-  //   return (
-  //     <FieldMappingModal 
-  //       documentId={selectedDocumentId} 
-  //       onClose={() => {
-  //         setSelectedDocumentId(null);
-  //         setShowReviewModal(false);
-  //       }} 
-  //     />
-  //   );
-  // }
+  if (selectedDocumentId && showReviewModal) {
+    return (
+      <FieldMappingModal 
+        documentId={selectedDocumentId} 
+        onClose={() => {
+          setSelectedDocumentId(null);
+          setShowReviewModal(false);
+        }} 
+      />
+    );
+  }
 
   if (selectedDocumentId && !showReviewModal) {
     return (

@@ -175,52 +175,87 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
           ) : currentStep === 'mapping' ? (
             /* Field Mapping Step */
             <div className="h-full flex flex-col">
-              <div className="p-6 border-b border-gray-200 bg-gray-50">
-                <p className="text-sm text-gray-600">
-                  Map the columns from your document to Salesforce fields. We've made some automatic suggestions based on column names.
-                </p>
+              <div className="p-6 border-b border-gray-200 bg-blue-50">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-blue-600 font-semibold text-sm">1</span>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Map Your Document Fields</h3>
+                    <p className="text-sm text-gray-600">
+                      Review the extracted columns below and map them to the correct Salesforce fields. 
+                      We've suggested mappings based on column names - feel free to adjust or skip any columns you don't need.
+                    </p>
+                  </div>
+                </div>
               </div>
               
               <ScrollArea className="flex-1">
                 <div className="p-6 space-y-4">
                   {extractedColumns.map((column) => (
-                    <Card key={column.index} className="overflow-hidden">
+                    <Card key={column.index} className={`overflow-hidden transition-all ${
+                      fieldMapping[column.index] && fieldMapping[column.index] !== 'skip' 
+                        ? 'border-green-200 bg-green-50' 
+                        : fieldMapping[column.index] === 'skip'
+                        ? 'border-gray-200 bg-gray-50 opacity-60'
+                        : 'border-blue-200 bg-blue-50'
+                    }`}>
                       <CardContent className="p-4">
                         <div className="flex items-start space-x-4">
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 mb-2">
-                              {column.name}
-                              <span className="ml-2 text-sm text-gray-500">
-                                (Column {column.index + 1})
-                              </span>
-                            </h4>
-                            <div className="space-y-1">
-                              <p className="text-xs text-gray-500 mb-1">Sample values:</p>
-                              {column.sampleValues.map((value, idx) => (
-                                <div key={idx} className="text-sm text-gray-700 bg-gray-50 px-2 py-1 rounded inline-block mr-2">
-                                  {value}
-                                </div>
-                              ))}
+                            <div className="flex items-center space-x-2 mb-2">
+                              <h4 className="font-medium text-gray-900">
+                                {column.name || `Column ${column.index + 1}`}
+                              </h4>
+                              {fieldMapping[column.index] && fieldMapping[column.index] !== 'skip' && (
+                                <Badge className="bg-green-100 text-green-800 text-xs">Mapped</Badge>
+                              )}
+                              {fieldMapping[column.index] === 'skip' && (
+                                <Badge className="bg-gray-100 text-gray-600 text-xs">Skipped</Badge>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium text-gray-500 mb-1">Sample data from your document:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {column.sampleValues.length > 0 ? column.sampleValues.map((value, idx) => (
+                                  <div key={idx} className="text-sm text-gray-700 bg-white border px-2 py-1 rounded max-w-xs truncate" title={value}>
+                                    {value}
+                                  </div>
+                                )) : (
+                                  <div className="text-sm text-gray-400 italic">No sample data available</div>
+                                )}
+                              </div>
                             </div>
                           </div>
                           
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-3">
                             <ArrowRight className="h-4 w-4 text-gray-400" />
-                            <Select
-                              value={fieldMapping[column.index] || ''}
-                              onValueChange={(value) => handleFieldMappingChange(column.index, value)}
-                            >
-                              <SelectTrigger className="w-48">
-                                <SelectValue placeholder="Select Salesforce field" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {SALESFORCE_FIELDS.map((field) => (
-                                  <SelectItem key={field.value} value={field.value}>
-                                    {field.label}
+                            <div className="min-w-[200px]">
+                              <Select
+                                value={fieldMapping[column.index] || ''}
+                                onValueChange={(value) => handleFieldMappingChange(column.index, value)}
+                              >
+                                <SelectTrigger className={`w-full ${
+                                  fieldMapping[column.index] && fieldMapping[column.index] !== 'skip'
+                                    ? 'border-green-300 bg-white'
+                                    : 'border-gray-300'
+                                }`}>
+                                  <SelectValue placeholder="Choose field..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="">
+                                    <span className="text-gray-500">Select a field...</span>
                                   </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                                  {SALESFORCE_FIELDS.map((field) => (
+                                    <SelectItem key={field.value} value={field.value}>
+                                      {field.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -232,10 +267,21 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
           ) : (
             /* Preview Step */
             <div className="h-full flex flex-col">
-              <div className="p-6 border-b border-gray-200 bg-gray-50">
-                <p className="text-sm text-gray-600">
-                  Preview of how your data will appear in Salesforce. This shows the first 5 rows.
-                </p>
+              <div className="p-6 border-b border-gray-200 bg-green-50">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                      <span className="text-green-600 font-semibold text-sm">2</span>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-gray-900 mb-1">Review & Edit Your Data</h3>
+                    <p className="text-sm text-gray-600">
+                      Double-check the data below and feel free to adjust anything that looks incorrect. 
+                      This preview shows the first 5 rows - the same structure will be applied to all {csvData?.rows?.length || 0} rows when uploaded to Salesforce.
+                    </p>
+                  </div>
+                </div>
               </div>
               
               <ScrollArea className="flex-1">
