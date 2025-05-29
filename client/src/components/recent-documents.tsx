@@ -274,17 +274,18 @@ export function RecentDocuments() {
     );
   };
 
-  if (selectedDocumentId && showReviewModal) {
-    return (
-      <FieldMappingModal 
-        documentId={selectedDocumentId} 
-        onClose={() => {
-          setSelectedDocumentId(null);
-          setShowReviewModal(false);
-        }} 
-      />
-    );
-  }
+  // Temporarily disabled field mapping modal
+  // if (selectedDocumentId && showReviewModal) {
+  //   return (
+  //     <FieldMappingModal 
+  //       documentId={selectedDocumentId} 
+  //       onClose={() => {
+  //         setSelectedDocumentId(null);
+  //         setShowReviewModal(false);
+  //       }} 
+  //     />
+  //   );
+  // }
 
   if (selectedDocumentId && !showReviewModal) {
     return (

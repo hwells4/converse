@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVPreview } from "@/components/csv-preview";
-import { DocumentReviewModal } from "@/components/document-review-modal";
+import { FieldMappingModal } from "@/components/field-mapping-modal";
 import { ToastNotifications } from "@/components/toast-notifications";
 import { FileText, Download, Eye, ArrowLeft, Search, Filter, Shield, Trash2, ChevronDown, CheckCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -455,12 +455,12 @@ export default function Documents() {
         isLoading={deletingDocumentId === deleteConfirmation.documentId}
       />
       
-      {/* Review Modal */}
+      {/* Field Mapping Modal */}
       {reviewDocumentId && (
-        <DocumentReviewModal
+        <FieldMappingModal
           documentId={reviewDocumentId}
           onClose={() => {
-            console.log("Closing review modal");
+            console.log("Closing field mapping modal");
             setReviewDocumentId(null);
           }}
         />

@@ -52,7 +52,7 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
   // Process CSV data to extract columns and sample values
   useEffect(() => {
     if (csvData && csvData.headers && csvData.rows) {
-      const columns: ExtractedColumn[] = csvData.headers.map((header, index) => {
+      const columns: ExtractedColumn[] = csvData.headers.map((header: string, index: number) => {
         // Get first 3 non-empty sample values for this column
         const sampleValues = csvData.rows
           .slice(0, 10) // Look at first 10 rows
