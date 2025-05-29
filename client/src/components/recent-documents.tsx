@@ -4,6 +4,7 @@ import { useDocuments, useDeleteDocument } from "@/hooks/use-documents";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVPreview } from "./csv-preview";
 import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
@@ -15,6 +16,15 @@ export function RecentDocuments() {
   const { toast } = useToast();
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<number | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    documentId: number | null;
+    documentName: string;
+  }>({
+    isOpen: false,
+    documentId: null,
+    documentName: "",
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -83,18 +93,24 @@ export function RecentDocuments() {
   };
 
   const handleDeleteDocument = async (documentId: number, documentName: string) => {
-    if (!confirm(`Are you sure you want to delete "${documentName}"? This action cannot be undone.`)) {
-      return;
-    }
+    setDeleteConfirmation({
+      isOpen: true,
+      documentId,
+      documentName,
+    });
+  };
 
-    setDeletingDocumentId(documentId);
+  const confirmDelete = async () => {
+    if (!deleteConfirmation.documentId) return;
+
+    setDeletingDocumentId(deleteConfirmation.documentId);
     
     try {
-      await deleteDocument.mutateAsync(documentId);
+      await deleteDocument.mutateAsync(deleteConfirmation.documentId);
 
       toast({
         title: "Document Deleted",
-        description: `"${documentName}" has been deleted successfully.`,
+        description: `"${deleteConfirmation.documentName}" has been deleted successfully.`,
       });
     } catch (error) {
       toast({
@@ -104,7 +120,20 @@ export function RecentDocuments() {
       });
     } finally {
       setDeletingDocumentId(null);
+      setDeleteConfirmation({
+        isOpen: false,
+        documentId: null,
+        documentName: "",
+      });
     }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmation({
+      isOpen: false,
+      documentId: null,
+      documentName: "",
+    });
   };
 
   const getActionButtons = (document: any) => {
@@ -322,6 +351,18 @@ export function RecentDocuments() {
           </table>
         </div>
       </div>
+
+      <ConfirmationDialog
+        isOpen={deleteConfirmation.isOpen}
+        onClose={cancelDelete}
+        onConfirm={confirmDelete}
+        title="Delete Document"
+        description={`Are you sure you want to delete "${deleteConfirmation.documentName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={deletingDocumentId === deleteConfirmation.documentId}
+      />
     </div>
   );
 }

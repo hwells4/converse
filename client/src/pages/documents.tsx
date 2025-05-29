@@ -1,21 +1,37 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { useDocuments } from "@/hooks/use-documents";
+import { useDocuments, useDeleteDocument } from "@/hooks/use-documents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVPreview } from "@/components/csv-preview";
-import { FileText, Download, Eye, ArrowLeft, Search, Filter, Shield } from "lucide-react";
+import { ToastNotifications } from "@/components/toast-notifications";
+import { FileText, Download, Eye, ArrowLeft, Search, Filter, Shield, Trash2, ChevronDown, CheckCircle } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Documents() {
   const { data: documents, isLoading } = useDocuments();
+  const deleteDocument = useDeleteDocument();
+  const { toast } = useToast();
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [deletingDocumentId, setDeletingDocumentId] = useState<number | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    documentId: number | null;
+    documentName: string;
+  }>({
+    isOpen: false,
+    documentId: null,
+    documentName: "",
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -79,6 +95,50 @@ export default function Documents() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleDeleteDocument = async (documentId: number, documentName: string) => {
+    setDeleteConfirmation({
+      isOpen: true,
+      documentId,
+      documentName,
+    });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmation.documentId) return;
+
+    setDeletingDocumentId(deleteConfirmation.documentId);
+    
+    try {
+      await deleteDocument.mutateAsync(deleteConfirmation.documentId);
+
+      toast({
+        title: "Document Deleted",
+        description: `"${deleteConfirmation.documentName}" has been deleted successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the document. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingDocumentId(null);
+      setDeleteConfirmation({
+        isOpen: false,
+        documentId: null,
+        documentName: "",
+      });
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmation({
+      isOpen: false,
+      documentId: null,
+      documentName: "",
+    });
   };
 
   const filteredDocuments = documents?.filter(doc => {
@@ -270,30 +330,84 @@ export default function Documents() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {(document.status === "processed" || document.status === "review_pending") && document.csvUrl ? (
-                          <div className="flex space-x-3">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDownloadCSV(document.csvUrl!, document.originalName)}
-                              className="text-blue-600 hover:text-blue-700 h-8 px-2"
-                            >
-                              <Download className="h-4 w-4 mr-1" />
-                              Download
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSelectedDocumentId(document.id)}
-                              className="text-gray-600 hover:text-gray-800 h-8 px-2"
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
+                          <div className="flex items-center space-x-1">
+                            {/* Primary Action Button */}
+                            {document.status === "review_pending" ? (
+                              <Button
+                                size="sm"
+                                onClick={() => setSelectedDocumentId(document.id)}
+                                className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Review
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => setSelectedDocumentId(document.id)}
+                                className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                Preview
+                              </Button>
+                            )}
+                            
+                            {/* Dropdown Menu */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => setSelectedDocumentId(document.id)}
+                                  className="cursor-pointer"
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View CSV Preview
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDownloadCSV(document.csvUrl!, document.originalName)}
+                                  className="cursor-pointer"
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Download CSV
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteDocument(document.id, document.originalName)}
+                                  disabled={deletingDocumentId === document.id}
+                                  className="cursor-pointer text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  {deletingDocumentId === document.id ? "Deleting..." : "Delete"}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         ) : (
-                          <span className="text-gray-400">
-                            {document.status === "processing" ? "Processing..." : "Not available"}
-                          </span>
+                          <div className="flex items-center space-x-1">
+                            <span className="text-gray-400 text-sm">
+                              {document.status === "processing" ? "Processing..." : "Not available"}
+                            </span>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteDocument(document.id, document.originalName)}
+                                  disabled={deletingDocumentId === document.id}
+                                  className="cursor-pointer text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  {deletingDocumentId === document.id ? "Deleting..." : "Delete"}
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -338,6 +452,20 @@ export default function Documents() {
           </div>
         </div>
       </main>
+
+      <ConfirmationDialog
+        isOpen={deleteConfirmation.isOpen}
+        onClose={cancelDelete}
+        onConfirm={confirmDelete}
+        title="Delete Document"
+        description={`Are you sure you want to delete "${deleteConfirmation.documentName}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+        isLoading={deletingDocumentId === deleteConfirmation.documentId}
+      />
+      
+      <ToastNotifications />
     </div>
   );
 }

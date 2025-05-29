@@ -5,7 +5,6 @@ import { apiRequest } from "@/lib/queryClient";
 export function useDocuments() {
   return useQuery<Document[]>({
     queryKey: ["/api/documents"],
-    select: (documents) => documents.filter(doc => doc.status !== "deleted"),
   });
 }
 
@@ -50,10 +49,7 @@ export function useDeleteDocument() {
 
   return useMutation({
     mutationFn: async (id: number): Promise<void> => {
-      const response = await apiRequest("DELETE", `/api/documents/${id}`);
-      if (!response.ok) {
-        throw new Error("Failed to delete document");
-      }
+      await apiRequest("DELETE", `/api/documents/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
