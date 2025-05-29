@@ -191,9 +191,28 @@ export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModal
               <FileText className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Document Review</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Review & Confirm Data</h2>
               {document && (
-                <p className="text-gray-600">{document.originalName}</p>
+                <div className="flex items-center space-x-4 text-sm text-gray-600">
+                  <span>{document.originalName}</span>
+                  <span>•</span>
+                  <span className="capitalize">{document.documentType}</span>
+                  {document.uploadedAt && (
+                    <>
+                      <span>•</span>
+                      <span>Uploaded {format(new Date(document.uploadedAt), 'MMM d, yyyy')}</span>
+                    </>
+                  )}
+                  {document.status === 'review_pending' && (
+                    <>
+                      <span>•</span>
+                      <Badge className="bg-blue-100 text-blue-800 text-xs">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Ready for Review
+                      </Badge>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -203,9 +222,9 @@ export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModal
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden p-6">
+        <div className="flex-1 overflow-hidden">
           {documentLoading ? (
-            <div className="space-y-4">
+            <div className="space-y-4 p-6">
               <Skeleton className="h-8 w-64" />
               <Skeleton className="h-32 w-full" />
             </div>
@@ -218,238 +237,188 @@ export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModal
               </div>
             </div>
           ) : (
-            <div className="h-full flex flex-col space-y-6">
-              {/* Document Info Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Document Information</span>
+            <div className="h-full flex flex-col">
+              {/* Controls Bar */}
+              <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    {/* View Mode Toggle */}
                     <div className="flex items-center space-x-2">
-                      {document.status === 'review_pending' && (
-                        <Badge className="bg-blue-100 text-blue-800">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Ready for Review
-                        </Badge>
-                      )}
-                      {document.status === 'processing' && (
-                        <Badge className="bg-yellow-100 text-yellow-800">
-                          Processing...
-                        </Badge>
-                      )}
-                      {document.status === 'failed' && (
-                        <Badge className="bg-red-100 text-red-800">
-                          <AlertCircle className="h-3 w-3 mr-1" />
-                          Processing Failed
-                        </Badge>
-                      )}
+                      <span className="text-sm text-gray-600">View:</span>
+                      <Button
+                        variant={viewMode === 'json' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setViewMode('json')}
+                        className="text-xs"
+                      >
+                        Structured
+                      </Button>
+                      <Button
+                        variant={viewMode === 'csv' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setViewMode('csv')}
+                        className="text-xs"
+                      >
+                        CSV
+                      </Button>
                     </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-gray-500">File Name:</span>
-                      <p className="text-gray-900">{document.originalName}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-500">Document Type:</span>
-                      <p className="text-gray-900 capitalize">{document.documentType}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-500">Uploaded:</span>
-                      <p className="text-gray-900">
-                        {document.uploadedAt 
-                          ? format(new Date(document.uploadedAt), 'MMM d, yyyy HH:mm')
-                          : 'Unknown'
-                        }
-                      </p>
-                    </div>
-                    {document.processedAt && (
-                      <div>
-                        <span className="font-medium text-gray-500">Processed:</span>
-                        <p className="text-gray-900">
-                          {format(new Date(document.processedAt), 'MMM d, yyyy HH:mm')}
-                        </p>
-                      </div>
+                    
+                    {tableData && (
+                      <span className="text-sm text-gray-500">
+                        {tableData.rows.length} rows • {tableData.headers.length} columns
+                      </span>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Button variant="outline" size="sm">
+                      <Edit3 className="h-4 w-4 mr-2" />
+                      Edit Data
+                    </Button>
+                    {document.csvUrl && (
+                      <Button variant="outline" size="sm">
+                        <Download className="h-4 w-4 mr-2" />
+                        Download CSV
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-              {/* Data Table */}
-              <Card className="flex-1 overflow-hidden">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Extracted Data</span>
-                    <div className="flex items-center space-x-2">
-                      {/* View Mode Toggle */}
-                      <div className="flex items-center space-x-2 mr-4">
-                        <span className="text-sm text-gray-600">View:</span>
-                        <Button
-                          variant={viewMode === 'json' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setViewMode('json')}
-                          className="text-xs"
-                        >
-                          JSON
-                        </Button>
-                        <Button
-                          variant={viewMode === 'csv' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => setViewMode('csv')}
-                          className="text-xs"
-                        >
-                          CSV
-                        </Button>
+              {/* Table Area */}
+              <div className="flex-1 overflow-hidden">
+                {(viewMode === 'json' ? dataLoading : csvLoading) ? (
+                  <div className="space-y-3 p-6">
+                    {[...Array(5)].map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : (viewMode === 'json' ? dataError : csvError) ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                      <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Data Not Available</h3>
+                      <p className="text-gray-600">
+                        {document.status === 'processing' 
+                          ? 'Document is still being processed. Please check back later.'
+                          : `Processed ${viewMode.toUpperCase()} data could not be loaded.`}
+                      </p>
+                    </div>
+                  </div>
+                ) : tableData ? (
+                  <div className="h-full flex flex-col">
+                    {/* Selection Controls */}
+                    <div className="flex items-center justify-between p-3 bg-gray-50 border-b">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            checked={selectAll}
+                            onCheckedChange={handleSelectAll}
+                            id="select-all"
+                          />
+                          <label htmlFor="select-all" className="text-sm font-medium text-gray-700 cursor-pointer">
+                            Select All
+                          </label>
+                        </div>
+                        <span className="text-sm text-gray-600">
+                          {selectedCount} of {totalRows} rows selected
+                        </span>
                       </div>
                       
-                      <Button variant="outline" size="sm">
-                        <Edit3 className="h-4 w-4 mr-2" />
-                        Edit Data
-                      </Button>
-                      {document.csvUrl && (
-                        <Button variant="outline" size="sm">
-                          <Download className="h-4 w-4 mr-2" />
-                          Download CSV
-                        </Button>
-                      )}
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-hidden">
-                  {(viewMode === 'json' ? dataLoading : csvLoading) ? (
-                    <div className="space-y-3">
-                      {[...Array(5)].map((_, i) => (
-                        <Skeleton key={i} className="h-12 w-full" />
-                      ))}
-                    </div>
-                  ) : (viewMode === 'json' ? dataError : csvError) ? (
-                    <div className="flex items-center justify-center h-64">
-                      <div className="text-center">
-                        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Data Not Available</h3>
-                        <p className="text-gray-600">
-                          {document.status === 'processing' 
-                            ? 'Document is still being processed. Please check back later.'
-                            : `Processed ${viewMode.toUpperCase()} data could not be loaded.`}
-                        </p>
+                      <div className="flex items-center space-x-2 text-xs text-gray-500">
+                        <ArrowRight className="h-3 w-3" />
+                        <span>Scroll right for more columns</span>
+                        <ArrowDown className="h-3 w-3 ml-4" />
+                        <span>Scroll down for more rows</span>
                       </div>
                     </div>
-                  ) : tableData ? (
-                    <div className="h-full flex flex-col">
-                      {/* Selection Controls */}
-                      <div className="flex items-center justify-between p-3 bg-gray-50 border-b">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              checked={selectAll}
-                              onCheckedChange={handleSelectAll}
-                              id="select-all"
-                            />
-                            <label htmlFor="select-all" className="text-sm font-medium text-gray-700 cursor-pointer">
-                              Select All
-                            </label>
-                          </div>
-                          <span className="text-sm text-gray-600">
-                            {selectedCount} of {totalRows} rows selected
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2 text-xs text-gray-500">
-                          <ArrowRight className="h-3 w-3" />
-                          <span>Scroll right for more columns</span>
-                          <ArrowDown className="h-3 w-3 ml-4" />
-                          <span>Scroll down for more rows</span>
-                        </div>
-                      </div>
 
-                      {/* Table Container */}
-                      <div className="flex-1 relative">
-                        <ScrollArea className="h-full w-full">
-                          <div className="min-w-full">
-                            {/* Header */}
-                            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
-                              <div className="flex">
-                                {/* Selection column */}
-                                <div className="w-12 flex-shrink-0 p-2 bg-gray-50 border-r border-gray-200">
-                                  <div className="h-8 flex items-center justify-center">
-                                    <span className="text-xs font-medium text-gray-500">#</span>
-                                  </div>
+                    {/* Table Container */}
+                    <div className="flex-1 relative">
+                      <ScrollArea className="h-full w-full">
+                        <div className="min-w-full">
+                          {/* Header */}
+                          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
+                            <div className="flex">
+                              {/* Selection column */}
+                              <div className="w-12 flex-shrink-0 p-2 bg-gray-50 border-r border-gray-200">
+                                <div className="h-8 flex items-center justify-center">
+                                  <span className="text-xs font-medium text-gray-500">#</span>
                                 </div>
-                                
-                                {/* Data columns */}
-                                {tableData.headers.map((header, index) => (
-                                  <div 
-                                    key={index}
-                                    className="min-w-[120px] max-w-[250px] flex-shrink-0 p-2 bg-gray-50 border-r border-gray-200 last:border-r-0"
-                                  >
-                                    <div className="h-8 flex items-center">
-                                      <span className="text-xs font-semibold text-gray-700 truncate" title={header}>
-                                        {header}
-                                      </span>
-                                    </div>
-                                  </div>
-                                ))}
                               </div>
-                            </div>
-
-                            {/* Rows */}
-                            <div className="divide-y divide-gray-100">
-                              {tableData.rows.map((row, rowIndex) => (
+                              
+                              {/* Data columns */}
+                              {tableData.headers.map((header, index) => (
                                 <div 
-                                  key={rowIndex}
-                                  className={`flex hover:bg-gray-50 transition-colors ${
-                                    selectedRows[rowIndex] ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
-                                  }`}
+                                  key={index}
+                                  className="min-w-[120px] max-w-[250px] flex-shrink-0 p-2 bg-gray-50 border-r border-gray-200 last:border-r-0"
                                 >
-                                  {/* Selection column */}
-                                  <div className="w-12 flex-shrink-0 p-2 border-r border-gray-200">
-                                    <div className="h-8 flex items-center justify-center">
-                                      <Checkbox
-                                        checked={selectedRows[rowIndex] || false}
-                                        onCheckedChange={(checked) => handleRowSelect(rowIndex, checked as boolean)}
-                                        className="scale-90"
-                                      />
-                                    </div>
+                                  <div className="h-8 flex items-center">
+                                    <span className="text-xs font-semibold text-gray-700 truncate" title={header}>
+                                      {header}
+                                    </span>
                                   </div>
-                                  
-                                  {/* Data columns */}
-                                  {row.map((cell, cellIndex) => (
-                                    <div 
-                                      key={cellIndex}
-                                      className={`min-w-[120px] max-w-[250px] flex-shrink-0 p-2 border-r border-gray-200 last:border-r-0 ${
-                                        getConfidenceColor(cell.confidence)
-                                      }`}
-                                    >
-                                      <div className="h-8 flex items-center justify-between">
-                                        <span 
-                                          className="text-sm text-gray-900 truncate mr-1" 
-                                          title={cell.value}
-                                        >
-                                          {cell.value}
-                                        </span>
-                                        {getConfidenceBadge(cell.confidence)}
-                                      </div>
-                                    </div>
-                                  ))}
                                 </div>
                               ))}
                             </div>
                           </div>
-                        </ScrollArea>
-                      </div>
+
+                          {/* Rows */}
+                          <div className="divide-y divide-gray-100">
+                            {tableData.rows.map((row, rowIndex) => (
+                              <div 
+                                key={rowIndex}
+                                className={`flex hover:bg-gray-50 transition-colors ${
+                                  selectedRows[rowIndex] ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
+                                }`}
+                              >
+                                {/* Selection column */}
+                                <div className="w-12 flex-shrink-0 p-2 border-r border-gray-200">
+                                  <div className="h-8 flex items-center justify-center">
+                                    <Checkbox
+                                      checked={selectedRows[rowIndex] || false}
+                                      onCheckedChange={(checked) => handleRowSelect(rowIndex, checked as boolean)}
+                                      className="scale-90"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                {/* Data columns */}
+                                {row.map((cell, cellIndex) => (
+                                  <div 
+                                    key={cellIndex}
+                                    className={`min-w-[120px] max-w-[250px] flex-shrink-0 p-2 border-r border-gray-200 last:border-r-0 ${
+                                      getConfidenceColor(cell.confidence)
+                                    }`}
+                                  >
+                                    <div className="h-8 flex items-center justify-between">
+                                      <span 
+                                        className="text-sm text-gray-900 truncate mr-1" 
+                                        title={cell.value}
+                                      >
+                                        {cell.value}
+                                      </span>
+                                      {getConfidenceBadge(cell.confidence)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </ScrollArea>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-64">
-                      <div className="text-center">
-                        <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Data Available</h3>
-                        <p className="text-gray-600">No processed data found for this document.</p>
-                      </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                      <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No Data Available</h3>
+                      <p className="text-gray-600">No processed data found for this document.</p>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -485,11 +454,11 @@ export function DocumentReviewModal({ documentId, onClose }: DocumentReviewModal
               </Button>
               {selectedCount > 0 ? (
                 <Button className="bg-green-600 hover:bg-green-700">
-                  Approve {selectedCount} Row{selectedCount === 1 ? '' : 's'}
+                  Upload {selectedCount} Row{selectedCount === 1 ? '' : 's'} to Salesforce
                 </Button>
               ) : (
                 <Button className="bg-blue-600 hover:bg-blue-700">
-                  Review All Data
+                  Upload All Data to Salesforce
                 </Button>
               )}
             </div>
