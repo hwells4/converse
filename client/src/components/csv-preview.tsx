@@ -50,7 +50,7 @@ export function CSVPreview({ documentId, onClose }: CSVPreviewProps) {
     if (documentData?.csvUrl && documentData?.originalName) {
       const link = document.createElement("a");
       link.href = documentData.csvUrl;
-      link.download = documentData.originalName.replace(".pdf", ".csv");
+      link.download = documentData.originalName?.replace(".pdf", ".csv") || "document.csv";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

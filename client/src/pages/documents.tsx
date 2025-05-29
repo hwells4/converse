@@ -322,7 +322,6 @@ export default function Documents() {
                         {format(new Date(document.uploadedAt), "MMM dd, yyyy 'at' h:mm a")}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {console.log("Document status:", document.status, "for document:", document.originalName)}
                         {(document.status === "processed" || document.status === "review_pending") && document.csvUrl ? (
                           <div className="flex items-center space-x-1">
                             {/* Primary Action Button */}
