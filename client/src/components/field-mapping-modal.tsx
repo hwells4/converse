@@ -47,6 +47,7 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
   const [extractedColumns, setExtractedColumns] = useState<ExtractedColumn[]>([]);
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>({});
   const [previewData, setPreviewData] = useState<any[]>([]);
+  const [editablePreviewData, setEditablePreviewData] = useState<any[]>([]);
   const [currentStep, setCurrentStep] = useState<'mapping' | 'preview'>('mapping');
 
   // Process CSV data to extract columns and sample values
@@ -91,10 +92,10 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
     }
   }, [csvData]);
 
-  // Generate preview data based on current mapping
+  // Generate preview data based on current mapping (show ALL rows, not just 5)
   useEffect(() => {
     if (csvData && csvData.rows && Object.keys(fieldMapping).length > 0) {
-      const mappedData = csvData.rows.slice(0, 5).map((row: any) => {
+      const mappedData = csvData.rows.map((row: any) => {
         const mappedRow: any = {};
         Object.entries(fieldMapping).forEach(([columnIndex, salesforceField]) => {
           if (salesforceField !== 'skip') {
@@ -105,8 +106,18 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
         return mappedRow;
       });
       setPreviewData(mappedData);
+      setEditablePreviewData(mappedData); // Initialize editable data
     }
   }, [fieldMapping, csvData]);
+
+  // Handle cell editing in preview
+  const handleCellEdit = (rowIndex: number, fieldName: string, newValue: string) => {
+    setEditablePreviewData(prev => {
+      const updated = [...prev];
+      updated[rowIndex] = { ...updated[rowIndex], [fieldName]: newValue };
+      return updated;
+    });
+  };
 
   const handleFieldMappingChange = (columnIndex: number, salesforceField: string) => {
     setFieldMapping(prev => ({
@@ -283,30 +294,76 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
               
               <ScrollArea className="flex-1">
                 <div className="p-6">
-                  {previewData.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full border border-gray-200 rounded-lg">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            {Object.keys(previewData[0]).map((fieldName) => (
-                              <th key={fieldName} className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
-                                {fieldName}
+                  {editablePreviewData.length > 0 ? (
+                    <div className="space-y-4">
+                      {/* Summary Stats */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium text-blue-900">Data Summary</h4>
+                            <p className="text-sm text-blue-700">
+                              {editablePreviewData.length} rows • {Object.keys(editablePreviewData[0]).length} mapped fields
+                            </p>
+                          </div>
+                          <div className="text-sm text-blue-600">
+                            Click any cell below to edit
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Editable Table */}
+                      <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 w-12">
+                                Row
                               </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {previewData.map((row, rowIndex) => (
-                            <tr key={rowIndex} className="hover:bg-gray-50">
-                              {Object.values(row).map((value: any, colIndex) => (
-                                <td key={colIndex} className="px-4 py-3 text-sm text-gray-900 border-b border-gray-200">
-                                  {value}
-                                </td>
+                              {Object.keys(editablePreviewData[0]).map((fieldName) => (
+                                <th key={fieldName} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200 min-w-[150px]">
+                                  {fieldName}
+                                </th>
                               ))}
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-100">
+                            {editablePreviewData.map((row, rowIndex) => (
+                              <tr key={rowIndex} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 text-xs text-gray-500 border-r border-gray-200 bg-gray-50">
+                                  {rowIndex + 1}
+                                </td>
+                                {Object.entries(row).map(([fieldName, value]: [string, any]) => (
+                                  <td key={fieldName} className="px-1 py-1 border-r border-gray-100 last:border-r-0">
+                                    <input
+                                      type="text"
+                                      value={value || ''}
+                                      onChange={(e) => handleCellEdit(rowIndex, fieldName, e.target.value)}
+                                      className="w-full px-2 py-1 text-sm border-0 bg-transparent focus:bg-white focus:ring-1 focus:ring-blue-500 focus:border-blue-500 rounded"
+                                      placeholder="Enter value..."
+                                    />
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Edit Instructions */}
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div className="flex items-start space-x-2">
+                          <div className="text-yellow-600 mt-0.5">💡</div>
+                          <div>
+                            <h4 className="font-medium text-yellow-900 mb-1">Pro Tips</h4>
+                            <ul className="text-sm text-yellow-800 space-y-1">
+                              <li>• Click any cell to edit its value</li>
+                              <li>• Empty cells will be uploaded as blank values</li>
+                              <li>• Changes are automatically saved as you type</li>
+                              <li>• This preview shows all {editablePreviewData.length} rows that will be uploaded</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-12">
@@ -328,7 +385,7 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
               {currentStep === 'mapping' ? (
                 <span>{mappedFieldsCount} of {totalColumns} fields mapped</span>
               ) : (
-                <span>Preview showing first 5 rows of {csvData?.rows?.length || 0} total rows</span>
+                <span>Showing all {editablePreviewData.length} rows • Click any cell to edit</span>
               )}
             </div>
             <div className="flex items-center space-x-3">
@@ -349,9 +406,12 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
                   <Button variant="outline" onClick={handleBackToMapping}>
                     Back to Mapping
                   </Button>
-                  <Button className="bg-green-600 hover:bg-green-700">
+                  <Button 
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={handleUploadToSalesforce}
+                  >
                     <Upload className="h-4 w-4 mr-2" />
-                    Upload to Salesforce
+                    Send to Salesforce
                   </Button>
                 </>
               )}
