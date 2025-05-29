@@ -134,6 +134,18 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
     setCurrentStep('mapping');
   };
 
+  const handleUploadToSalesforce = () => {
+    // TODO: Convert editablePreviewData to CSV format and upload
+    console.log('Uploading edited data to Salesforce:', editablePreviewData);
+    
+    // This will eventually:
+    // 1. Convert editablePreviewData to CSV format
+    // 2. Send the CSV data to the backend for Salesforce upload
+    // 3. Update document status to 'uploaded'
+    
+    onClose();
+  };
+
   const mappedFieldsCount = Object.values(fieldMapping).filter(field => field !== 'skip').length;
   const totalColumns = extractedColumns.length;
 
