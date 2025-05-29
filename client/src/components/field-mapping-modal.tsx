@@ -245,9 +245,6 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
                                   <SelectValue placeholder="Choose field..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">
-                                    <span className="text-gray-500">Select a field...</span>
-                                  </SelectItem>
                                   {SALESFORCE_FIELDS.map((field) => (
                                     <SelectItem key={field.value} value={field.value}>
                                       {field.label}
