@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVPreview } from "@/components/csv-preview";
+import { DocumentReviewModal } from "@/components/document-review-modal";
 import { ToastNotifications } from "@/components/toast-notifications";
 import { FileText, Download, Eye, ArrowLeft, Search, Filter, Shield, Trash2, ChevronDown, CheckCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -19,6 +20,7 @@ export default function Documents() {
   const deleteDocument = useDeleteDocument();
   const { toast } = useToast();
   const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
+  const [reviewDocumentId, setReviewDocumentId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -149,15 +151,6 @@ export default function Documents() {
     
     return matchesSearch && matchesStatus && matchesType;
   }) || [];
-
-  if (selectedDocumentId) {
-    return (
-      <CSVPreview 
-        documentId={selectedDocumentId} 
-        onClose={() => setSelectedDocumentId(null)} 
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -329,13 +322,18 @@ export default function Documents() {
                         {format(new Date(document.uploadedAt), "MMM dd, yyyy 'at' h:mm a")}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        {console.log("Document status:", document.status, "for document:", document.originalName)}
                         {(document.status === "processed" || document.status === "review_pending") && document.csvUrl ? (
                           <div className="flex items-center space-x-1">
                             {/* Primary Action Button */}
                             {document.status === "review_pending" ? (
                               <Button
                                 size="sm"
-                                onClick={() => setSelectedDocumentId(document.id)}
+                                onClick={() => {
+                                  console.log("Review button clicked for document:", document.id);
+                                  setSelectedDocumentId(null); // Clear CSV preview state
+                                  setReviewDocumentId(document.id);
+                                }}
                                 className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
                               >
                                 <CheckCircle className="h-4 w-4 mr-1" />
@@ -344,7 +342,11 @@ export default function Documents() {
                             ) : (
                               <Button
                                 size="sm"
-                                onClick={() => setSelectedDocumentId(document.id)}
+                                onClick={() => {
+                                  console.log("Preview button clicked for document:", document.id);
+                                  setSelectedDocumentId(null); // Clear CSV preview state
+                                  setReviewDocumentId(document.id);
+                                }}
                                 className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
                               >
                                 <Eye className="h-4 w-4 mr-1" />
@@ -361,7 +363,11 @@ export default function Documents() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                  onClick={() => setSelectedDocumentId(document.id)}
+                                  onClick={() => {
+                                    console.log("CSV Preview dropdown clicked for document:", document.id);
+                                    setReviewDocumentId(null); // Clear review modal state
+                                    setSelectedDocumentId(document.id);
+                                  }}
                                   className="cursor-pointer"
                                 >
                                   <Eye className="h-4 w-4 mr-2" />
@@ -464,6 +470,28 @@ export default function Documents() {
         variant="destructive"
         isLoading={deletingDocumentId === deleteConfirmation.documentId}
       />
+      
+      {/* Review Modal */}
+      {reviewDocumentId && (
+        <DocumentReviewModal
+          documentId={reviewDocumentId}
+          onClose={() => {
+            console.log("Closing review modal");
+            setReviewDocumentId(null);
+          }}
+        />
+      )}
+      
+      {/* CSV Preview Modal */}
+      {selectedDocumentId && (
+        <CSVPreview 
+          documentId={selectedDocumentId} 
+          onClose={() => {
+            console.log("Closing CSV preview");
+            setSelectedDocumentId(null);
+          }} 
+        />
+      )}
       
       <ToastNotifications />
     </div>

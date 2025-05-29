@@ -15,6 +15,18 @@ export function useDocument(id: number) {
   });
 }
 
+export function useDocumentProcessedData(id: number) {
+  return useQuery<any>({
+    queryKey: ["/api/documents", id, "processed-json"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/documents/${id}/processed-json`);
+      return response.json();
+    },
+    enabled: !!id,
+    retry: false, // Don't retry if the processed data isn't available yet
+  });
+}
+
 export function useCreateDocument() {
   const queryClient = useQueryClient();
 

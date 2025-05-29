@@ -47,7 +47,7 @@ export function CSVPreview({ documentId, onClose }: CSVPreviewProps) {
   };
 
   const handleDownloadCSV = () => {
-    if (documentData?.csvUrl) {
+    if (documentData?.csvUrl && documentData?.originalName) {
       const link = document.createElement("a");
       link.href = documentData.csvUrl;
       link.download = documentData.originalName.replace(".pdf", ".csv");
@@ -116,7 +116,7 @@ export function CSVPreview({ documentId, onClose }: CSVPreviewProps) {
           <div className="flex items-center justify-between">
             <div>
               <h4 className="font-medium text-gray-900">
-                {documentData.originalName.replace(".pdf", ".csv")}
+                {documentData.originalName?.replace(".pdf", ".csv") || "Unknown file.csv"}
               </h4>
               <p className="text-sm text-gray-600">
                 {csvData ? `${csvData.totalRows} records extracted` : "Loading..."}
