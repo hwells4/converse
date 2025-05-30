@@ -29,7 +29,7 @@ const pdfParserTriggerSchema = z.object({
 const pdfParserWebhookSchema = z.object({
   status: z.enum(["success", "error"]),
   csv_url: z.string().url().optional(),
-  original_filename: z.string(),
+  document_id: z.number().positive(),
   message: z.string().optional(), // For error messages
 });
 
@@ -218,22 +218,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('🔍 Attempting to parse webhook body...');
       console.log('🔍 Expected schema: { status: "success"|"error", csv_url?: string, original_filename: string, message?: string }');
       
-      const { status, csv_url, original_filename, message } = pdfParserWebhookSchema.parse(req.body);
-      console.log('✅ Webhook validation passed:', { status, csv_url, original_filename, message });
+      const { status, csv_url, document_id, message } = pdfParserWebhookSchema.parse(req.body);
+      console.log('✅ Webhook validation passed:', { status, csv_url, document_id, message });
       
-      // Find the document by original filename
-      const documents = await storage.getDocuments();
-      const document = documents.find(doc => 
-        doc.originalName === original_filename && 
-        (doc.status === "processing" || doc.status === "uploaded")
-      );
+      // Get the document by ID
+      const document = await storage.getDocument(document_id);
       
       if (!document) {
-        console.error(`❌ Document not found for original filename: ${original_filename}`);
+        console.error(`❌ Document not found with ID: ${document_id}`);
         return res.status(404).json({ message: "Document not found" });
       }
       
-      console.log(`📄 Found document ID ${document.id} for filename: ${original_filename}`);
+      console.log(`📄 Found document ID ${document.id}: ${document.originalName}`);
       
       if (status === "success" && csv_url) {
         // Extract CSV S3 key from the URL - handle different S3 URL formats
