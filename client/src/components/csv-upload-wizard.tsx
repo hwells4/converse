@@ -7,6 +7,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { X, FileText, ArrowRight, ArrowLeft, Check, Table, Edit3, Upload, Eye, Plus, Trash2 } from "lucide-react";
+import { CommissionStatementConfirmation } from "./commission-statement-confirmation";
+import { CommissionStatement, N8NWebhookPayload } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface CSVUploadWizardProps {
   isOpen: boolean;
@@ -18,6 +22,7 @@ interface CSVUploadWizardProps {
   };
   fileName: string;
   carrierId: number;
+  documentId?: number;
   onComplete: (finalData: any) => void;
 }
 

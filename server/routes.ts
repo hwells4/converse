@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDocumentSchema, updateDocumentSchema, insertCarrierSchema, webhookDocumentProcessedSchema, pdfParserWebhookSchema } from "@shared/schema";
+import { insertDocumentSchema, updateDocumentSchema, insertCarrierSchema, webhookDocumentProcessedSchema, pdfParserWebhookSchema, n8nWebhookPayloadSchema } from "@shared/schema";
 import { BackendAWSService } from "./aws-service";
 import { z } from "zod";
 
@@ -861,6 +861,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false,
         message: "Webhook simulation failed",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // N8N webhook endpoint for Salesforce upload
+  app.post("/api/n8n/salesforce-upload", async (req, res) => {
+    console.log('🔵 N8N Salesforce upload webhook called');
+    console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
+    
+    try {
+      // Validate the payload
+      const validatedPayload = n8nWebhookPayloadSchema.parse(req.body);
+      console.log('✅ N8N payload validation passed');
+      
+      // Update document status to indicate Salesforce upload is pending
+      const document = await storage.getDocument(validatedPayload.documentId);
+      if (!document) {
+        console.error(`❌ Document not found for ID: ${validatedPayload.documentId}`);
+        return res.status(404).json({ 
+          success: false,
+          message: "Document not found" 
+        });
+      }
+
+      await storage.updateDocument(validatedPayload.documentId, {
+        status: "salesforce_upload_pending"
+      });
+
+      console.log(`✅ Document ${validatedPayload.documentId} status updated to salesforce_upload_pending`);
+
+      // Call N8N webhook
+      const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
+      if (!n8nWebhookUrl) {
+        console.error('❌ N8N_WEBHOOK_URL not configured');
+        return res.status(500).json({ 
+          success: false,
+          message: "N8N webhook URL not configured" 
+        });
+      }
+
+      console.log('🚀 Sending data to N8N webhook...');
+      const n8nResponse = await fetch(n8nWebhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(validatedPayload)
+      });
+
+      if (!n8nResponse.ok) {
+        console.error('❌ N8N webhook call failed:', n8nResponse.status, n8nResponse.statusText);
+        
+        // Update document status to failed
+        await storage.updateDocument(validatedPayload.documentId, {
+          status: "salesforce_upload_failed",
+          processingError: `N8N webhook failed: ${n8nResponse.status} ${n8nResponse.statusText}`
+        });
+
+        return res.status(500).json({ 
+          success: false,
+          message: "Failed to send data to N8N webhook",
+          error: `${n8nResponse.status} ${n8nResponse.statusText}`
+        });
+      }
+
+      const n8nResult = await n8nResponse.text();
+      console.log('✅ N8N webhook response:', n8nResult);
+
+      res.json({
+        success: true,
+        message: "Data sent to N8N successfully",
+        statement: validatedPayload.statement,
+        transactionCount: validatedPayload.transactionCount
+      });
+
+    } catch (error) {
+      console.error('💥 N8N webhook error:', error);
+      
+      if (error instanceof z.ZodError) {
+        console.error('❌ N8N payload validation failed:', error.errors);
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid payload for N8N webhook", 
+          errors: error.errors
+        });
+      }
+      
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to process N8N webhook request",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // N8N status callback endpoint (for N8N to report back success/failure)
+  app.post("/api/n8n/salesforce-status", async (req, res) => {
+    console.log('🔵 N8N status callback received');
+    console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
+    
+    try {
+      const { documentId, status, message } = req.body;
+      
+      if (!documentId || !status) {
+        return res.status(400).json({ 
+          success: false,
+          message: "documentId and status are required" 
+        });
+      }
+
+      const document = await storage.getDocument(documentId);
+      if (!document) {
+        console.error(`❌ Document not found for ID: ${documentId}`);
+        return res.status(404).json({ 
+          success: false,
+          message: "Document not found" 
+        });
+      }
+
+      let newStatus: string;
+      let processingError: string | null = null;
+
+      if (status === "success") {
+        newStatus = "completed";
+        console.log(`✅ Document ${documentId} successfully uploaded to Salesforce`);
+      } else if (status === "error" || status === "failed") {
+        newStatus = "salesforce_upload_failed";
+        processingError = message || "Salesforce upload failed";
+        console.log(`❌ Document ${documentId} failed to upload to Salesforce: ${processingError}`);
+      } else {
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid status. Must be 'success' or 'error'" 
+        });
+      }
+
+      await storage.updateDocument(documentId, {
+        status: newStatus,
+        ...(processingError && { processingError })
+      });
+
+      console.log(`✅ Document ${documentId} status updated to ${newStatus}`);
+
+      res.json({
+        success: true,
+        message: "Document status updated successfully",
+        documentId,
+        status: newStatus
+      });
+
+    } catch (error) {
+      console.error('💥 N8N status callback error:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to process status callback",
         error: error instanceof Error ? error.message : "Unknown error"
       });
     }

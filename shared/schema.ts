@@ -108,3 +108,25 @@ export const pdfParserWebhookSchema = z.object({
 });
 
 export type PDFParserWebhook = z.infer<typeof pdfParserWebhookSchema>;
+
+// Commission statement schema for final confirmation
+export const commissionStatementSchema = z.object({
+  carrierId: z.number(),
+  carrierName: z.string(),
+  statementAmount: z.number(),
+  statementNotes: z.string().optional(),
+  statementDate: z.string(), // ISO date string
+});
+
+export type CommissionStatement = z.infer<typeof commissionStatementSchema>;
+
+// N8N webhook payload schema for Salesforce upload
+export const n8nWebhookPayloadSchema = z.object({
+  statement: commissionStatementSchema,
+  transactions: z.array(z.record(z.string(), z.any())), // Array of mapped transaction data
+  transactionCount: z.number(),
+  documentId: z.number(),
+  fileName: z.string(),
+});
+
+export type N8NWebhookPayload = z.infer<typeof n8nWebhookPayloadSchema>;
