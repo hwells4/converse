@@ -69,10 +69,9 @@ export function SearchableSelect({
           />
         </div>
         <div 
-          className="max-h-[300px] overflow-y-auto p-1" 
+          className="max-h-[300px] overflow-y-scroll p-1" 
           style={{ 
-            overscrollBehavior: 'contain',
-            WebkitOverflowScrolling: 'touch'
+            scrollBehavior: 'smooth'
           }}
         >
           {filteredOptions.length === 0 ? (

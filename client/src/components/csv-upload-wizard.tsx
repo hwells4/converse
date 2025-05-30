@@ -582,11 +582,10 @@ export function CSVUploadWizard({
                   </div>
                 </div>
                 <div 
-                  className="overflow-auto" 
+                  className="overflow-y-scroll" 
                   style={{ 
                     height: 'calc(100vh - 400px)',
-                    overscrollBehavior: 'contain',
-                    WebkitOverflowScrolling: 'touch'
+                    scrollBehavior: 'smooth'
                   }}
                 >
                   <table className="w-full">
@@ -684,11 +683,10 @@ export function CSVUploadWizard({
                   </div>
                 </div>
                 <div 
-                  className="overflow-auto flex-1 min-h-0" 
+                  className="overflow-y-scroll flex-1 min-h-0" 
                   style={{ 
                     maxHeight: '400px',
-                    overscrollBehavior: 'contain',
-                    WebkitOverflowScrolling: 'touch'
+                    scrollBehavior: 'smooth'
                   }}
                 >
                   <div className="space-y-0">
@@ -763,10 +761,9 @@ export function CSVUploadWizard({
               {/* Main editing interface - fills remaining space */}
               <div className="flex-1 mx-4 mb-4 border border-t-0 rounded-b-lg overflow-hidden bg-white">
                 <div 
-                  className="overflow-auto h-full" 
+                  className="overflow-y-scroll h-full" 
                   style={{ 
-                    overscrollBehavior: 'contain',
-                    WebkitOverflowScrolling: 'touch'
+                    scrollBehavior: 'smooth'
                   }}
                 >
                   <table className="w-full">
