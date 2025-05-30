@@ -21,6 +21,7 @@ export function RecentDocuments() {
     parsedData: any;
     fileName: string;
     carrierId: number;
+    documentId: number;
   } | null>(null);
 
   const handleOpenCSVWizard = async (document: any) => {
@@ -49,7 +50,8 @@ export function RecentDocuments() {
         isOpen: true,
         parsedData,
         fileName: document.originalName || document.filename,
-        carrierId: document.carrierId || 1
+        carrierId: document.carrierId || 1,
+        documentId: document.id
       });
     } catch (error) {
       console.error("Error opening CSV wizard:", error);
@@ -325,6 +327,7 @@ export function RecentDocuments() {
         parsedData={csvWizardData.parsedData}
         fileName={csvWizardData.fileName}
         carrierId={csvWizardData.carrierId}
+        documentId={csvWizardData.documentId}
         onComplete={(finalData) => {
           console.log("CSV wizard completed:", finalData);
           setCsvWizardData(null);

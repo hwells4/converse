@@ -1,0 +1,53 @@
+Warning: validateDOMNesting(...): <div> cannot appear as a descendant of &lt;p&gt;.
+    at div
+    at Badge (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/components/ui/badge.tsx:35:18)
+    at p
+    at div
+    at div
+    at div
+    at _c9 (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/components/ui/card.tsx:114:12)
+    at div
+    at _c (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/components/ui/card.tsx:20:11)
+    at div
+    at div
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-AXMZZQ2X.js?v=ee96e64d:42:13
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-6ILK2XNM.js?v=ee96e64d:102:7
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=ee96e64d:79:13
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=ee96e64d:56:13
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-AXMZZQ2X.js?v=ee96e64d:42:13
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-X33QFKQB.js?v=ee96e64d:62:5
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-3JJJY2IO.js?v=ee96e64d:233:13
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-3JJJY2IO.js?v=ee96e64d:156:58
+    at Presence (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-YE5GEEUL.js?v=ee96e64d:24:11)
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-3JJJY2IO.js?v=ee96e64d:147:64
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=ee96e64d:79:13
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-2K77HOHX.js?v=ee96e64d:56:13
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-AXMZZQ2X.js?v=ee96e64d:42:13
+    at https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-6ILK2XNM.js?v=ee96e64d:301:22
+    at Presence (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-YE5GEEUL.js?v=ee96e64d:24:11)
+    at Provider (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=ee96e64d:38:15)
+    at DialogPortal (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-3JJJY2IO.js?v=ee96e64d:109:11)
+    at _c3 (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/components/ui/dialog.tsx:52:12)
+    at Provider (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=ee96e64d:38:15)
+    at Dialog (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-3JJJY2IO.js?v=ee96e64d:50:5)
+    at CommissionStatementConfirmation (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/components/commission-statement-confirmation.tsx:30:3)
+    at Provider (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-OXZDJRWN.js?v=ee96e64d:38:15)
+    at Dialog (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/chunk-3JJJY2IO.js?v=ee96e64d:50:5)
+    at CSVUploadWizard (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/components/csv-upload-wizard.tsx:48:3)
+    at RecentDocuments (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/components/recent-documents.tsx:32:42)
+    at main
+    at div
+    at Home (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/pages/home.tsx:27:53)
+    at Route…
+Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+Failed to upload to Salesforce: 
+Error {}
+message: "404: {"success":false,"message":"Document not found"}"
+stack: "Error: 404: {"success":false,"message":"Document not found"}↵ at throwIfResNotOk (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/lib/queryClient.ts:5:11)↵ at async apiRequest (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/lib/queryClient.ts:15:3)↵ at async handleConfirmationSubmit (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/components/csv-upload-wizard.tsx:255:27)↵ at async handleSubmit (https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/src/components/commission-statement-confirmation.tsx:90:7)"
+get stack: ƒ ()
+set stack: ƒ ()
+[[Prototype]]: Object
+
+Failed to upload to Salesforce: 
+Error {}
+
