@@ -194,13 +194,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test webhook endpoint to verify connectivity
+  app.post("/api/test-webhook", async (req, res) => {
+    console.log('🧪 TEST WEBHOOK RECEIVED');
+    console.log('🧪 Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('🧪 Body:', JSON.stringify(req.body, null, 2));
+    res.json({ success: true, message: "Test webhook received successfully", timestamp: new Date().toISOString() });
+  });
+
   // PDF Parser webhook endpoint
   app.post("/api/pdf-parse-webhook", async (req, res) => {
-    console.log('🔵 Received PDF parser webhook');
+    console.log('🔵 ========= WEBHOOK RECEIVED =========');
+    console.log('🔵 Timestamp:', new Date().toISOString());
     console.log('🔵 Request headers:', JSON.stringify(req.headers, null, 2));
     console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
     console.log('🔵 Raw body type:', typeof req.body);
+    console.log('🔵 Body keys:', Object.keys(req.body || {}));
     console.log('🔵 Request IP:', req.ip || req.connection.remoteAddress);
+    console.log('🔵 =====================================');
     
     try {
       // Log raw body for debugging
