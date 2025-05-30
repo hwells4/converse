@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useDocument, useDocumentProcessedCSVData } from "@/hooks/use-documents";
+import { useDocument, useDocumentCSVData } from "@/hooks/use-documents";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
