@@ -172,6 +172,12 @@ export function useUpload() {
           // Start polling for results using document status
           startPolling(document.id);
 
+          // Reset processing state since the API call is complete
+          setUploadState(prev => ({ ...prev, isProcessing: false }));
+
+          // Return the document so the modal knows the upload was successful
+          return document;
+
         } catch (processingError) {
           await updateDocument.mutateAsync({
             id: document.id,

@@ -162,13 +162,13 @@ export function CommissionStatementConfirmation({
                 </div>
                 <div>
                   <span className="font-medium text-gray-600">Transactions:</span>
-                  <p className="text-gray-900 flex items-center gap-2">
+                  <div className="text-gray-900 flex items-center gap-2">
                     {transactionCount}
                     <Badge variant="secondary" className="text-xs">
                       <Users className="h-3 w-3 mr-1" />
                       {transactionCount === 1 ? 'transaction' : 'transactions'}
                     </Badge>
-                  </p>
+                  </div>
                 </div>
               </div>
             </CardContent>

@@ -1,13 +1,7 @@
-import { pgTable, serial, text, timestamp, foreignKey, integer, jsonb } from "drizzle-orm/pg-core"
+import { pgTable, foreignKey, serial, text, integer, jsonb, timestamp, unique } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
-
-export const carriers = pgTable("carriers", {
-	id: serial().primaryKey().notNull(),
-	name: text().notNull(),
-	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
-});
 
 export const documents = pgTable("documents", {
 	id: serial().primaryKey().notNull(),
@@ -34,4 +28,13 @@ export const documents = pgTable("documents", {
 			foreignColumns: [carriers.id],
 			name: "documents_carrier_id_carriers_id_fk"
 		}),
+]);
+
+export const carriers = pgTable("carriers", {
+	id: serial().primaryKey().notNull(),
+	name: text().notNull(),
+	createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+	salesforceId: text("salesforce_id"),
+}, (table) => [
+	unique("carriers_salesforce_id_unique").on(table.salesforceId),
 ]);

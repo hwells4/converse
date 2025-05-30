@@ -248,7 +248,12 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
     setShowDuplicateWarning(false);
     if (selectedFile && documentType && selectedCarrierId) {
       const finalFileName = generateFileName(selectedFile.name, customFileName);
-      await uploadFile(selectedFile, documentType, parseInt(selectedCarrierId), finalFileName);
+      const uploadResult = await uploadFile(selectedFile, documentType, parseInt(selectedCarrierId), finalFileName);
+      
+      // Close the modal after successful upload for any file type
+      if (uploadResult) {
+        handleClose();
+      }
     }
   };
 

@@ -5,6 +5,12 @@ alwaysApply: true
 ---
 # Replit Development Guidelines
 
+## **CRITICAL: NEVER START DEV SERVERS**
+- **NEVER EVER run `npm run dev`, `npm start`, or any local development server commands**
+- **Replit automatically handles server hosting - DO NOT interfere with this**
+- **The user will test through Replit's hosted frontend - NOT local servers**
+- **If you start a dev server, IMMEDIATELY kill it and apologize**
+
 ## **Server Management**
 - **DO NOT start local development servers** using `npm run dev`, `npm start`, or similar commands when working on Replit
 - Replit provides its own hosting environment that automatically serves the application

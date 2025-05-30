@@ -40,6 +40,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/carriers/:id", async (req, res) => {
+    try {
+      const carrierId = parseInt(req.params.id);
+      if (isNaN(carrierId)) {
+        return res.status(400).json({ message: "Invalid carrier ID" });
+      }
+      
+      const carrier = await storage.getCarrier(carrierId);
+      if (!carrier) {
+        return res.status(404).json({ message: "Carrier not found" });
+      }
+      
+      res.json(carrier);
+    } catch (error) {
+      console.error("Failed to fetch carrier:", error);
+      res.status(500).json({ message: "Failed to fetch carrier" });
+    }
+  });
+
   app.post("/api/carriers", async (req, res) => {
     try {
       const carrierData = insertCarrierSchema.parse(req.body);
