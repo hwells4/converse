@@ -68,7 +68,7 @@ export function SearchableSelect({
             className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
           />
         </div>
-        <div className="max-h-[300px] overflow-y-auto p-1" style={{ overflowBehavior: 'contain' }}>
+        <div className="max-h-[300px] overflow-y-auto p-1">
           {filteredOptions.length === 0 ? (
             <div className="py-6 text-center text-sm text-muted-foreground">
               No carriers found.
