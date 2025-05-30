@@ -46,6 +46,21 @@ export function useDocumentProcessedCSVData(id: number) {
   });
 }
 
+export function useDocumentCSVData(id: number) {
+  return useQuery<any>({
+    queryKey: ["/api/documents", id, "csv-data"],
+    queryFn: async () => {
+      console.log(`Fetching CSV data for document ${id}`);
+      const response = await apiRequest("GET", `/api/documents/${id}/csv-data`);
+      const data = await response.json();
+      console.log(`Received CSV data for document ${id}:`, data);
+      return data;
+    },
+    enabled: !!id,
+    retry: false,
+  });
+}
+
 export function useCreateDocument() {
   const queryClient = useQueryClient();
 

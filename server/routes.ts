@@ -204,18 +204,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get processed CSV data as JSON for display
-  app.get("/api/documents/:id/processed-csv-data", async (req, res) => {
+  // Get CSV data (either processed from PDF or directly uploaded CSV)
+  app.get("/api/documents/:id/csv-data", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      console.log(`🔵 Fetching processed CSV data for document ID: ${id}`);
+      console.log(`🔵 Fetching CSV data for document ID: ${id}`);
       
       const document = await storage.getDocument(id);
       console.log(`📄 Document found:`, {
         id: document?.id,
         filename: document?.filename,
         status: document?.status,
-        csvS3Key: document?.csvS3Key
+        csvS3Key: document?.csvS3Key,
+        s3Key: document?.s3Key
       });
       
       if (!document) {
@@ -223,18 +224,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Document not found" });
       }
 
-      if (!document.csvS3Key) {
-        console.log(`❌ Document ${id} has no csvS3Key`);
-        return res.status(404).json({ message: "Processed CSV not available" });
-      }
-
       if (!BackendAWSService.isConfigured()) {
         console.log(`❌ AWS credentials not configured`);
         return res.status(500).json({ message: "AWS credentials not configured" });
       }
 
-      console.log(`☁️ Downloading CSV from S3 key: ${document.csvS3Key}`);
-      const csvContent = await BackendAWSService.downloadFromS3(document.csvS3Key);
+      let csvContent: string;
+
+      // Check if this is a processed PDF (has csvS3Key) or direct CSV upload
+      if (document.csvS3Key) {
+        console.log(`☁️ Downloading processed CSV from S3 key: ${document.csvS3Key}`);
+        csvContent = await BackendAWSService.downloadFromS3(document.csvS3Key);
+      } else if (document.s3Key && (document.s3Key.endsWith('.csv') || document.filename.endsWith('.csv'))) {
+        console.log(`☁️ Downloading direct CSV upload from S3 key: ${document.s3Key}`);
+        csvContent = await BackendAWSService.downloadFromS3(document.s3Key);
+      } else {
+        console.log(`❌ Document ${id} has no CSV data available`);
+        return res.status(404).json({ message: "CSV data not available for this document" });
+      }
+
       console.log(`📥 Downloaded CSV content length: ${csvContent.length} characters`);
       
       // Parse CSV content into JSON
