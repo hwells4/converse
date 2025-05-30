@@ -3,7 +3,7 @@ import { useDocument, useDocumentCSVData } from "@/hooks/use-documents";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, FileText, AlertCircle, CheckCircle, ArrowRight, Upload, Eye, Plus, Trash2 } from "lucide-react";
@@ -101,7 +101,7 @@ const SALESFORCE_FIELDS = [
 
 export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProps) {
   const { data: document, isLoading: documentLoading } = useDocument(documentId);
-  const { data: csvData, isLoading: csvLoading, error: csvError } = useDocumentProcessedCSVData(documentId);
+  const { data: csvData, isLoading: csvLoading, error: csvError } = useDocumentCSVData(documentId);
   const [extractedColumns, setExtractedColumns] = useState<ExtractedColumn[]>([]);
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>({});
   const [previewData, setPreviewData] = useState<any[]>([]);
@@ -333,25 +333,15 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
                           <div className="flex items-center space-x-3">
                             <ArrowRight className="h-4 w-4 text-gray-400" />
                             <div className="min-w-[200px]">
-                              <Select
+                              <SearchableSelect
+                                options={SALESFORCE_FIELDS}
                                 value={fieldMapping[column.index] || ''}
                                 onValueChange={(value) => handleFieldMappingChange(column.index, value)}
-                              >
-                                <SelectTrigger className={`w-full ${
-                                  fieldMapping[column.index] && fieldMapping[column.index] !== 'skip'
-                                    ? 'border-green-300 bg-white'
-                                    : 'border-gray-300'
-                                }`}>
-                                  <SelectValue placeholder="Choose field..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {SALESFORCE_FIELDS.map((field) => (
-                                    <SelectItem key={field.value} value={field.value}>
-                                      {field.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                                placeholder="Choose field..."
+                                className={fieldMapping[column.index] && fieldMapping[column.index] !== 'skip'
+                                  ? 'border-green-300 bg-white'
+                                  : 'border-gray-300'}
+                              />
                             </div>
                           </div>
                         </div>
