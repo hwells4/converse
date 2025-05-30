@@ -303,11 +303,13 @@ export function CSVUploadWizard({
       };
 
       // Send to N8N webhook
-      await apiRequest("POST", "/api/n8n/salesforce-upload", payload);
+      const n8nResponse = await apiRequest("POST", "/api/n8n/salesforce-upload", payload);
+      
+      console.log("N8N webhook response:", n8nResponse);
 
       toast({
-        title: "Upload Successful",
-        description: `Commission statement and ${editableData.length} transactions sent to Salesforce.`,
+        title: "Upload Successful", 
+        description: `Commission statement and ${editableData.length} transactions sent to Salesforce. CSV uploaded to S3: ${csvUploadResult.csvS3Key}`,
       });
 
       clearCache(); // Clear cache on successful completion

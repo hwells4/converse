@@ -970,38 +970,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use environment variable or default to test URL
       // Set N8N_WEBHOOK_URL environment variable to override, or change USE_PRODUCTION_N8N below
       const USE_PRODUCTION_N8N = false; // Change this to true for production
+      const TEST_MODE = false; // Change this to true to skip N8N webhook calls for testing
       
       const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || (USE_PRODUCTION_N8N ? N8N_PROD_URL : N8N_TEST_URL);
       
       console.log(`🔗 Using N8N webhook: ${USE_PRODUCTION_N8N ? 'PRODUCTION' : 'TEST'} - ${n8nWebhookUrl}`);
+      console.log(`🧪 Test mode: ${TEST_MODE ? 'ENABLED (skipping webhook)' : 'DISABLED'}`);
 
-      console.log('🚀 Sending data to N8N webhook...');
-      const n8nResponse = await fetch(n8nWebhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(validatedPayload)
-      });
-
-      if (!n8nResponse.ok) {
-        console.error('❌ N8N webhook call failed:', n8nResponse.status, n8nResponse.statusText);
-        
-        // Update document status to failed
-        await storage.updateDocument(validatedPayload.documentId, {
-          status: "salesforce_upload_failed",
-          processingError: `N8N webhook failed: ${n8nResponse.status} ${n8nResponse.statusText}`
+      if (TEST_MODE) {
+        console.log('🧪 TEST MODE: Skipping N8N webhook call');
+        console.log('📋 Payload that would be sent:', JSON.stringify(validatedPayload, null, 2));
+      } else {
+        console.log('🚀 Sending data to N8N webhook...');
+        const n8nResponse = await fetch(n8nWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(validatedPayload)
         });
 
-        return res.status(500).json({ 
-          success: false,
-          message: "Failed to send data to N8N webhook",
-          error: `${n8nResponse.status} ${n8nResponse.statusText}`
-        });
+        if (!n8nResponse.ok) {
+          console.error('❌ N8N webhook call failed:', n8nResponse.status, n8nResponse.statusText);
+          
+          // Try to get response text for debugging
+          let errorText = '';
+          try {
+            errorText = await n8nResponse.text();
+            console.error('❌ N8N response body:', errorText);
+          } catch (e) {
+            console.error('❌ Could not read N8N response body');
+          }
+          
+          // Update document status to failed
+          await storage.updateDocument(validatedPayload.documentId, {
+            status: "salesforce_upload_failed",
+            processingError: `N8N webhook failed: ${n8nResponse.status} ${n8nResponse.statusText} - ${errorText.substring(0, 200)}`
+          });
+
+          return res.status(500).json({ 
+            success: false,
+            message: "Failed to send data to N8N webhook",
+            error: `${n8nResponse.status} ${n8nResponse.statusText}`,
+            responseBody: errorText.substring(0, 500)
+          });
+        }
+
+        const n8nResult = await n8nResponse.text();
+        console.log('✅ N8N webhook response:', n8nResult);
       }
-
-      const n8nResult = await n8nResponse.text();
-      console.log('✅ N8N webhook response:', n8nResult);
 
       res.json({
         success: true,
