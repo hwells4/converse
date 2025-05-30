@@ -190,7 +190,10 @@ export function CSVUploadWizard({
 
   const handleHeaderRowChange = (newHeaderRow: number) => {
     setSelectedHeaderRow(newHeaderRow);
-    if (dataRows[newHeaderRow]) {
+    if (newHeaderRow === -1) {
+      // Headers are already correct, keep the current headers
+      setHeaders(parsedData?.headers || headers);
+    } else if (dataRows[newHeaderRow]) {
       setHeaders(dataRows[newHeaderRow]);
     }
   };
@@ -377,13 +380,14 @@ export function CSVUploadWizard({
                   <div className="flex items-center space-x-2">
                     <span className="text-sm font-medium text-blue-900">Which row has your column names?</span>
                     <Select value={selectedHeaderRow.toString()} onValueChange={(value) => handleHeaderRowChange(parseInt(value))}>
-                      <SelectTrigger className="w-40 bg-white">
+                      <SelectTrigger className="w-48 bg-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="-1">Headers are already correct</SelectItem>
                         {dataRows.slice(0, 5).map((row, index) => (
                           <SelectItem key={index} value={index.toString()}>
-                            Row {index + 1}
+                            Row {index + 1}: {row.slice(0, 2).map(cell => cell.length > 15 ? cell.substring(0, 15) + '...' : cell).join(', ')}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -416,15 +420,34 @@ export function CSVUploadWizard({
                 <ScrollArea className="flex-1" style={{ height: 'calc(100vh - 400px)' }}>
                   <table className="w-full">
                     <thead className="bg-gray-50 sticky top-0">
-                      <tr>
+                      <tr className={selectedHeaderRow === -1 ? 'bg-blue-100 border-2 border-blue-400' : ''}>
                         {headers.map((header, index) => (
-                          <th key={index} className="px-4 py-3 text-left text-sm font-medium text-gray-900 border-r">
+                          <th key={index} className={`px-4 py-3 text-left text-sm font-medium border-r ${
+                            selectedHeaderRow === -1 ? 'text-blue-900' : 'text-gray-900'
+                          }`}>
                             {header || `Column ${index + 1}`}
+                            {selectedHeaderRow === -1 && (
+                              <span className="ml-2 text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">HEADER</span>
+                            )}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
+                      {/* Show the selected header row if it's not -1 */}
+                      {selectedHeaderRow >= 0 && (
+                        <tr className="bg-blue-100 border-2 border-blue-400">
+                          {dataRows[selectedHeaderRow]?.map((cell, cellIndex) => (
+                            <td key={cellIndex} className="px-4 py-3 text-sm text-blue-900 border-r font-medium">
+                              <div className="max-w-[150px] truncate flex items-center" title={cell}>
+                                {cell}
+                                <span className="ml-2 text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">HEADER</span>
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+                      )}
+                      {/* Show data rows starting after the selected header row */}
                       {dataRows.slice(selectedHeaderRow + 1, selectedHeaderRow + 21).map((row, rowIndex) => (
                         <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           {row.map((cell, cellIndex) => (
