@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { FieldMappingModal } from "./field-mapping-modal";
+import { CSVUploadWizard } from "./csv-upload-wizard";
 import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink, ChevronDown, CheckCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -16,7 +16,37 @@ export function RecentDocuments() {
   const { data: documents, isLoading } = useDocuments();
   const deleteDocument = useDeleteDocument();
   const { toast } = useToast();
-  const [reviewDocumentId, setReviewDocumentId] = useState<number | null>(null);
+  const [csvWizardData, setCsvWizardData] = useState<{
+    isOpen: boolean;
+    parsedData: any;
+    fileName: string;
+    carrierId: number;
+  } | null>(null);
+
+  const handleOpenCSVWizard = async (document: any) => {
+    try {
+      // For now, we'll use placeholder data since the CSV wizard expects parsed CSV data
+      // In your FastAPI implementation, this will fetch the actual CSV data
+      const placeholderData = {
+        headers: ["Policy Number", "Insured Name", "Premium", "Commission"],
+        rows: [["SAMPLE001", "Sample Client", "$1000", "$100"]],
+        detectedHeaderRow: 0
+      };
+      
+      setCsvWizardData({
+        isOpen: true,
+        parsedData: placeholderData,
+        fileName: document.originalName || document.filename,
+        carrierId: document.carrierId || 1
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to open document for review",
+        variant: "destructive",
+      });
+    }
+  };
   const [deletingDocumentId, setDeletingDocumentId] = useState<number | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean;
@@ -184,7 +214,9 @@ export function RecentDocuments() {
             <Button
               size="sm"
               onClick={() => {
-                setReviewDocumentId(document.id);
+                // For CSV wizard, we need to fetch the document data and open the wizard
+                // This will be handled by a function that fetches CSV data and opens the wizard
+                handleOpenCSVWizard(document);
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
             >
@@ -195,7 +227,7 @@ export function RecentDocuments() {
             <Button
               size="sm"
               onClick={() => {
-                setReviewDocumentId(document.id);
+                handleOpenCSVWizard(document);
               }}
               className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
             >
@@ -214,7 +246,7 @@ export function RecentDocuments() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onClick={() => {
-                  setReviewDocumentId(document.id);
+                  handleOpenCSVWizard(document);
                 }}
                 className="cursor-pointer"
               >
@@ -270,13 +302,20 @@ export function RecentDocuments() {
     );
   };
 
-  if (reviewDocumentId) {
+  if (csvWizardData?.isOpen) {
     return (
-      <FieldMappingModal 
-        documentId={reviewDocumentId} 
+      <CSVUploadWizard 
+        isOpen={csvWizardData.isOpen}
         onClose={() => {
-          setReviewDocumentId(null);
-        }} 
+          setCsvWizardData(null);
+        }}
+        parsedData={csvWizardData.parsedData}
+        fileName={csvWizardData.fileName}
+        carrierId={csvWizardData.carrierId}
+        onComplete={(finalData) => {
+          console.log("CSV wizard completed:", finalData);
+          setCsvWizardData(null);
+        }}
       />
     );
   }
