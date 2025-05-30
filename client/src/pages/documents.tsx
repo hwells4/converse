@@ -495,25 +495,20 @@ export default function Documents() {
         isLoading={deletingDocumentId === deleteConfirmation.documentId}
       />
       
-      {/* Field Mapping Modal */}
-      {reviewDocumentId && (
-        <FieldMappingModal
-          documentId={reviewDocumentId}
+      {/* CSV Upload Wizard */}
+      {csvWizardData?.isOpen && (
+        <CSVUploadWizard 
+          isOpen={csvWizardData.isOpen}
           onClose={() => {
-            console.log("Closing field mapping modal");
-            setReviewDocumentId(null);
+            setCsvWizardData(null);
           }}
-        />
-      )}
-      
-      {/* CSV Preview Modal */}
-      {selectedDocumentId && (
-        <CSVPreview 
-          documentId={selectedDocumentId} 
-          onClose={() => {
-            console.log("Closing CSV preview");
-            setSelectedDocumentId(null);
-          }} 
+          parsedData={csvWizardData.parsedData}
+          fileName={csvWizardData.fileName}
+          carrierId={csvWizardData.carrierId}
+          onComplete={(finalData) => {
+            console.log("CSV wizard completed:", finalData);
+            setCsvWizardData(null);
+          }}
         />
       )}
       
