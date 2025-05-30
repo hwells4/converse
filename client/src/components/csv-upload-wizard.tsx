@@ -63,6 +63,25 @@ export function CSVUploadWizard({
   onComplete 
 }: CSVUploadWizardProps) {
   const { toast } = useToast();
+
+  // Format commission amounts with commas and two decimal places
+  const formatCommissionAmount = (value: string): string => {
+    if (!value || value === '') return '';
+    
+    // Clean the value - remove $ signs, commas, etc.
+    const cleanValue = String(value)
+      .replace(/[$,\s]/g, '')
+      .replace(/[()]/g, '-'); // Handle negative values in parentheses
+    
+    const amount = parseFloat(cleanValue);
+    if (isNaN(amount)) return value; // Return original if not a number
+    
+    // Format with commas and two decimal places
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
+  };
   const [currentStep, setCurrentStep] = useState<'preview' | 'mapping' | 'edit' | 'confirmation'>(parsedData ? 'preview' : 'preview');
   const [selectedHeaderRow, setSelectedHeaderRow] = useState<number>(-1); // Default to "headers are correct"
   const [headers, setHeaders] = useState<string[]>(parsedData?.headers || []);
@@ -169,13 +188,14 @@ export function CSVUploadWizard({
     return null;
   };
 
-  // Initialize auto-mapping when moving to mapping step
+  // Initialize auto-mapping when moving to mapping step (excluding commission amount)
   useEffect(() => {
     if (currentStep === 'mapping' && headers.length > 0 && Object.keys(fieldMapping).length === 0) {
       const autoMapping: FieldMapping = {};
       headers.forEach((header, index) => {
         const suggestion = getSuggestedMapping(header);
-        if (suggestion) {
+        // Don't auto-select commission amount to prevent accidental selection
+        if (suggestion && suggestion !== 'commission_amount') {
           autoMapping[index] = suggestion;
         }
       });
@@ -702,12 +722,17 @@ export function CSVUploadWizard({
                           </td>
                           {Object.values(fieldMapping).filter(field => field !== 'skip').map((field, cellIndex) => {
                             const fieldLabel = SALESFORCE_FIELDS.find(f => f.value === field)?.label || field;
+                            const isCommissionAmount = field === 'commission_amount';
+                            const displayValue = isCommissionAmount ? formatCommissionAmount(row[fieldLabel] || '') : (row[fieldLabel] || '');
+                            
                             return (
                               <td key={cellIndex} className="px-4 py-2 border-r">
                                 <Input
-                                  value={row[fieldLabel] || ''}
+                                  value={displayValue}
                                   onChange={(e) => handleCellEdit(rowIndex, fieldLabel, e.target.value)}
-                                  className="border-0 bg-transparent p-1 text-sm focus:bg-white focus:border"
+                                  className={`border-0 bg-transparent p-1 text-sm focus:bg-white focus:border ${
+                                    isCommissionAmount ? 'text-right font-mono' : ''
+                                  }`}
                                 />
                               </td>
                             );

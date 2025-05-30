@@ -35,9 +35,19 @@ export function CommissionStatementConfirmation({
   const { toast } = useToast();
   const { data: carrier } = useCarrier(carrierId);
   
+  // Format number with commas and two decimal places
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
+  };
+
   // Calculate total commission amount from mapped transactions
   const calculateStatementAmount = () => {
-    return mappedTransactions.reduce((total, transaction) => {
+    const total = mappedTransactions.reduce((sum, transaction) => {
       const commissionField = Object.keys(transaction).find(key => 
         key.toLowerCase().includes('commission') && 
         key.toLowerCase().includes('amount') &&
@@ -52,10 +62,13 @@ export function CommissionStatementConfirmation({
           .replace(/[()]/g, '-'); // Handle negative values in parentheses
         
         const amount = parseFloat(cleanValue);
-        return total + (isNaN(amount) ? 0 : amount);
+        return sum + (isNaN(amount) ? 0 : amount);
       }
-      return total;
+      return sum;
     }, 0);
+    
+    // Round to two decimal places
+    return Math.round(total * 100) / 100;
   };
 
   const [statementData, setStatementData] = useState<CommissionStatement>({

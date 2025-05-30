@@ -236,6 +236,9 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
             variant: "destructive",
           });
         }
+      } else if (fileType === 'pdf' && uploadResult) {
+        // For PDF files, close the modal after upload
+        handleClose();
       }
     }
   };
