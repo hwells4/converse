@@ -467,9 +467,9 @@ export function CSVUploadWizard({
           )}
 
           {currentStep === 'mapping' && (
-            <div className="p-4 flex-1 flex flex-col space-y-3">
+            <div className="flex-1 flex flex-col overflow-hidden">
               {/* Quick mapping suggestions - compressed */}
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mx-4 mt-4 mb-3 flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <Check className="h-4 w-4 text-green-600" />
@@ -498,159 +498,143 @@ export function CSVUploadWizard({
                 </div>
               </div>
 
-              {/* Main mapping interface */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Table className="h-5 w-5" />
-                    <span>Column Mapping</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* Table-style mapping view */}
-                    <div className="border rounded-lg overflow-hidden">
-                      <div className="bg-gray-50 px-6 py-3 border-b">
-                        <div className="grid grid-cols-4 gap-4 text-sm font-medium text-gray-700">
-                          <div>Your Column</div>
-                          <div>Sample Data</div>
-                          <div>Maps To</div>
-                          <div>Status</div>
+              {/* Main mapping interface - fills remaining space */}
+              <div className="flex-1 mx-4 mb-4 border rounded-lg overflow-hidden bg-white">
+                <div className="bg-gray-50 px-6 py-3 border-b flex items-center space-x-2 flex-shrink-0">
+                  <Table className="h-5 w-5" />
+                  <span className="font-semibold text-gray-900">Column Mapping</span>
+                </div>
+                <div className="bg-gray-50 px-6 py-3 border-b flex-shrink-0">
+                  <div className="grid grid-cols-4 gap-4 text-sm font-medium text-gray-700">
+                    <div>Your Column</div>
+                    <div>Sample Data</div>
+                    <div>Maps To</div>
+                    <div>Status</div>
+                  </div>
+                </div>
+                <ScrollArea className="flex-1">
+                  <div className="space-y-0">
+                    {headers.map((header, index) => (
+                      <div key={index} className="px-6 py-4 border-b border-gray-100 hover:bg-gray-50">
+                        <div className="grid grid-cols-4 gap-4 items-center">
+                          {/* Column name */}
+                          <div className="font-medium text-gray-900">
+                            {header || `Column ${index + 1}`}
+                          </div>
+                          
+                          {/* Sample data */}
+                          <div className="text-sm text-gray-600 font-mono bg-gray-100 px-2 py-1 rounded text-center">
+                            {dataRows[selectedHeaderRow + 1]?.[index] || 'No data'}
+                          </div>
+                          
+                          {/* Mapping dropdown */}
+                          <div>
+                            <Select 
+                              value={fieldMapping[index] || "none"} 
+                              onValueChange={(value) => handleMappingChange(index, value)}
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select field..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  <span className="text-gray-500">Skip this column</span>
+                                </SelectItem>
+                                {SALESFORCE_FIELDS.map((field) => (
+                                  <SelectItem key={field.value} value={field.value}>
+                                    {field.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          {/* Status indicator */}
+                          <div className="flex items-center">
+                            {fieldMapping[index] && fieldMapping[index] !== 'none' ? (
+                              <div className="flex items-center space-x-2 text-green-600">
+                                <Check className="h-4 w-4" />
+                                <span className="text-sm">Mapped</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center space-x-2 text-gray-400">
+                                <span className="w-4 h-4 border-2 border-gray-300 rounded-full"></span>
+                                <span className="text-sm">Unmapped</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <ScrollArea className="h-[300px]">
-                        <div className="space-y-0">
-                          {headers.map((header, index) => (
-                            <div key={index} className="px-6 py-4 border-b border-gray-100 hover:bg-gray-50">
-                              <div className="grid grid-cols-4 gap-4 items-center">
-                                {/* Column name */}
-                                <div className="font-medium text-gray-900">
-                                  {header || `Column ${index + 1}`}
-                                </div>
-                                
-                                {/* Sample data */}
-                                <div className="text-sm text-gray-600 font-mono bg-gray-100 px-2 py-1 rounded text-center">
-                                  {dataRows[selectedHeaderRow + 1]?.[index] || 'No data'}
-                                </div>
-                                
-                                {/* Mapping dropdown */}
-                                <div>
-                                  <Select 
-                                    value={fieldMapping[index] || "none"} 
-                                    onValueChange={(value) => handleMappingChange(index, value)}
-                                  >
-                                    <SelectTrigger className="w-full">
-                                      <SelectValue placeholder="Select field..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="none">
-                                        <span className="text-gray-500">Skip this column</span>
-                                      </SelectItem>
-                                      {SALESFORCE_FIELDS.map((field) => (
-                                        <SelectItem key={field.value} value={field.value}>
-                                          {field.label}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                
-                                {/* Status indicator */}
-                                <div className="flex items-center">
-                                  {fieldMapping[index] && fieldMapping[index] !== 'none' ? (
-                                    <div className="flex items-center space-x-2 text-green-600">
-                                      <Check className="h-4 w-4" />
-                                      <span className="text-sm">Mapped</span>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center space-x-2 text-gray-400">
-                                      <span className="w-4 h-4 border-2 border-gray-300 rounded-full"></span>
-                                      <span className="text-sm">Unmapped</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </div>
-
-
+                    ))}
                   </div>
-                </CardContent>
-              </Card>
+                </ScrollArea>
+              </div>
             </div>
           )}
 
           {currentStep === 'edit' && (
-            <div className="p-4 flex-1 flex flex-col space-y-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span className="flex items-center space-x-2">
-                      <Edit3 className="h-5 w-5" />
-                      <span>Data Review & Edit</span>
-                    </span>
-                    <Button onClick={addNewRow} size="sm" variant="outline">
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Row
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="border rounded-lg overflow-hidden">
-                    <ScrollArea className="h-[300px]">
-                      <table className="w-full">
-                        <thead className="bg-gray-50 sticky top-0">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-900 w-16">Actions</th>
-                            {Object.values(fieldMapping).filter(field => field !== 'skip').map((field, index) => {
-                              const fieldLabel = SALESFORCE_FIELDS.find(f => f.value === field)?.label || field;
-                              return (
-                                <th key={index} className="px-4 py-3 text-left text-sm font-medium text-gray-900 border-r min-w-32">
-                                  {fieldLabel}
-                                </th>
-                              );
-                            })}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {editableData.map((row, rowIndex) => (
-                            <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-4 py-2">
-                                <Button 
-                                  onClick={() => deleteRow(rowIndex)} 
-                                  size="sm" 
-                                  variant="ghost"
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Header with add row button */}
+              <div className="bg-gray-50 px-6 py-3 border-b flex items-center justify-between mx-4 mt-4 rounded-t-lg flex-shrink-0">
+                <div className="flex items-center space-x-2">
+                  <Edit3 className="h-5 w-5" />
+                  <span className="font-semibold text-gray-900">Data Review & Edit</span>
+                  <span className="text-sm text-gray-600">({editableData.length} rows)</span>
+                </div>
+                <Button onClick={addNewRow} size="sm" variant="outline">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Row
+                </Button>
+              </div>
+
+              {/* Main editing interface - fills remaining space */}
+              <div className="flex-1 mx-4 mb-4 border border-t-0 rounded-b-lg overflow-hidden bg-white">
+                <ScrollArea className="flex-1">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-900 w-16 border-r">Actions</th>
+                        {Object.values(fieldMapping).filter(field => field !== 'skip').map((field, index) => {
+                          const fieldLabel = SALESFORCE_FIELDS.find(f => f.value === field)?.label || field;
+                          return (
+                            <th key={index} className="px-4 py-3 text-left text-sm font-medium text-gray-900 border-r min-w-32">
+                              {fieldLabel}
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editableData.map((row, rowIndex) => (
+                        <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-4 py-2 border-r">
+                            <Button 
+                              onClick={() => deleteRow(rowIndex)} 
+                              size="sm" 
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </td>
+                          {Object.values(fieldMapping).filter(field => field !== 'skip').map((field, cellIndex) => {
+                            const fieldLabel = SALESFORCE_FIELDS.find(f => f.value === field)?.label || field;
+                            return (
+                              <td key={cellIndex} className="px-4 py-2 border-r">
+                                <Input
+                                  value={row[fieldLabel] || ''}
+                                  onChange={(e) => handleCellEdit(rowIndex, fieldLabel, e.target.value)}
+                                  className="border-0 bg-transparent p-1 text-sm focus:bg-white focus:border"
+                                />
                               </td>
-                              {Object.values(fieldMapping).filter(field => field !== 'skip').map((field, cellIndex) => {
-                                const fieldLabel = SALESFORCE_FIELDS.find(f => f.value === field)?.label || field;
-                                return (
-                                  <td key={cellIndex} className="px-4 py-2 border-r">
-                                    <Input
-                                      value={row[fieldLabel] || ''}
-                                      onChange={(e) => handleCellEdit(rowIndex, fieldLabel, e.target.value)}
-                                      className="border-0 bg-transparent p-1 text-sm"
-                                    />
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </ScrollArea>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-4">
-                    {editableData.length} rows ready for upload
-                  </p>
-                </CardContent>
-              </Card>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ScrollArea>
+              </div>
             </div>
           )}
         </div>
