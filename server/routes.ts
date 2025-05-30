@@ -203,6 +203,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('🔵 Request IP:', req.ip || req.connection.remoteAddress);
     
     try {
+      // Log raw body for debugging
+      console.log('🔍 Attempting to parse webhook body...');
+      console.log('🔍 Expected schema: { status: "success"|"error", document_id: number, csv_url?: string, error_message?: string }');
+      
       const { status, document_id, csv_url, error_message } = pdfParserWebhookSchema.parse(req.body);
       console.log('✅ Webhook validation passed:', { status, document_id, csv_url, error_message });
       
@@ -236,10 +240,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('💥 PDF parser webhook error:', error);
       
       if (error instanceof z.ZodError) {
-        console.error('❌ Webhook validation errors:', error.errors);
+        console.error('❌ Webhook validation errors:', JSON.stringify(error.errors, null, 2));
+        console.error('❌ Received data that failed validation:', JSON.stringify(req.body, null, 2));
         return res.status(400).json({ message: "Invalid webhook data", errors: error.errors });
       }
       
+      console.error('💥 Non-validation error:', error);
       res.status(500).json({ 
         success: false,
         message: "Failed to process webhook",
