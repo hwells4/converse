@@ -221,18 +221,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status, csv_url, original_filename, message } = pdfParserWebhookSchema.parse(req.body);
       console.log('✅ Webhook validation passed:', { status, csv_url, original_filename, message });
       
-      // For testing, let's just use document ID 24
-      const document = await storage.getDocument(24);
+      // Find the document by original filename
+      const documents = await storage.getDocuments();
+      const document = documents.find(doc => doc.originalName === original_filename);
       
       if (!document) {
-        console.error(`❌ Document ID 24 not found`);
+        console.error(`❌ Document not found for original filename: ${original_filename}`);
         return res.status(404).json({ message: "Document not found" });
       }
       
       console.log(`📄 Found document ID ${document.id}: ${document.originalName}`);
       
       if (status === "success" && csv_url) {
-        // Extract CSV S3 key from the URL - handle different S3 URL formats
+        // Extract CSV S3 key from the URL
         const csvS3Key = csv_url
           .replace('https://converseinsurance.s3.us-east-2.amazonaws.com/', '')
           .replace('https://s3.amazonaws.com/converseinsurance/', '')
