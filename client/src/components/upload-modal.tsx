@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useUpload } from "@/hooks/use-upload";
 import { useDocuments } from "@/hooks/use-documents";
@@ -330,23 +331,18 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
               Insurance Carrier *
             </Label>
             <div className="relative">
-              <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Select value={selectedCarrierId} onValueChange={setSelectedCarrierId}>
-                <SelectTrigger className="pl-10">
-                  <SelectValue placeholder="Select insurance carrier" />
-                </SelectTrigger>
-                <SelectContent>
-                  {carriersLoading ? (
-                    <SelectItem value="" disabled>Loading carriers...</SelectItem>
-                  ) : (
-                    carriers?.map((carrier) => (
-                      <SelectItem key={carrier.id} value={carrier.id.toString()}>
-                        {carrier.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400 z-10" />
+              <SearchableSelect
+                options={carriersLoading ? [] : carriers?.map((carrier) => ({
+                  value: carrier.id.toString(),
+                  label: carrier.name
+                })) || []}
+                value={selectedCarrierId || ""}
+                onValueChange={setSelectedCarrierId}
+                placeholder={carriersLoading ? "Loading carriers..." : "Search and select carrier..."}
+                className="pl-10"
+                disabled={carriersLoading}
+              />
             </div>
             <p className="text-xs text-gray-500">
               Select the insurance carrier associated with this document
