@@ -98,3 +98,13 @@ export const webhookDocumentProcessedSchema = z.object({
 );
 
 export type WebhookDocumentProcessed = z.infer<typeof webhookDocumentProcessedSchema>;
+
+// PDF Parser webhook schema (from Railway service)
+export const pdfParserWebhookSchema = z.object({
+  status: z.enum(["success", "error"]),
+  csv_url: z.string().url().optional(),
+  original_filename: z.string().min(1),
+  message: z.string().optional(),
+});
+
+export type PDFParserWebhook = z.infer<typeof pdfParserWebhookSchema>;

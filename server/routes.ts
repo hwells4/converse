@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDocumentSchema, updateDocumentSchema, insertCarrierSchema, webhookDocumentProcessedSchema } from "@shared/schema";
+import { insertDocumentSchema, updateDocumentSchema, insertCarrierSchema, webhookDocumentProcessedSchema, pdfParserWebhookSchema } from "@shared/schema";
 import { BackendAWSService } from "./aws-service";
 import { z } from "zod";
 
@@ -26,12 +26,7 @@ const pdfParserTriggerSchema = z.object({
   documentId: z.number().positive(),
 });
 
-const pdfParserWebhookSchema = z.object({
-  status: z.enum(["success", "error"]),
-  csv_url: z.string().url().optional(),
-  original_filename: z.string(),
-  message: z.string().optional(), // For error messages
-});
+
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Carrier management endpoints
@@ -221,12 +216,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status, csv_url, original_filename, message } = pdfParserWebhookSchema.parse(req.body);
       console.log('✅ Webhook validation passed:', { status, csv_url, original_filename, message });
       
-      // Find the document by original filename
-      const documents = await storage.getDocuments();
-      const document = documents.find(doc => doc.originalName === original_filename);
+      // Find the document by S3 key (original_filename is actually the S3 key)
+      const document = await storage.getDocumentByS3Key(original_filename);
       
       if (!document) {
-        console.error(`❌ Document not found for original filename: ${original_filename}`);
+        console.error(`❌ Document not found for S3 key: ${original_filename}`);
+        console.log('🔍 Searching all documents to debug...');
+        const allDocs = await storage.getDocuments();
+        console.log('🔍 Available S3 keys:', allDocs.map(d => d.s3Key));
         return res.status(404).json({ message: "Document not found" });
       }
       
