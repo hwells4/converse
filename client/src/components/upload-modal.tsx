@@ -15,6 +15,7 @@ import { Upload, FileText, X, Check, AlertCircle, Calendar, Building2 } from "lu
 import { format } from "date-fns";
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
+import { SpreadsheetFieldMapping } from "./spreadsheet-field-mapping";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
   const [parsedData, setParsedData] = useState<ParsedSpreadsheetData | null>(null);
   const [selectedHeaderRow, setSelectedHeaderRow] = useState<number | null>(null);
   const [fileType, setFileType] = useState<'pdf' | 'csv' | 'xlsx' | null>(null);
+  const [showFieldMapping, setShowFieldMapping] = useState(false);
   const { uploadState, uploadFile, resetUpload } = useUpload();
   const { data: documents } = useDocuments();
   const { data: carriers, isLoading: carriersLoading } = useCarriers();
@@ -303,6 +305,13 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
   };
 
   const canUpload = selectedFile && documentType && selectedCarrierId && !uploadState.isUploading && !uploadState.isProcessing;
+  
+  const getUploadButtonText = () => {
+    if (fileType === 'csv' || fileType === 'xlsx') {
+      return "Proceed to Field Mapping";
+    }
+    return "Upload Document";
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -312,7 +321,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
             Upload Document
           </DialogTitle>
           <DialogDescription className="text-sm text-gray-600">
-            Upload your {getDocumentTypeLabel()} PDF file
+            Upload your {getDocumentTypeLabel()} file (PDF, CSV, or XLSX)
           </DialogDescription>
         </DialogHeader>
 
@@ -382,11 +391,11 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
               <input {...getInputProps()} />
               <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h4 className="text-lg font-medium text-gray-900 mb-2">
-                Drop your PDF file here
+                Drop your file here
               </h4>
               <p className="text-gray-600 mb-4">or click to browse and select a file</p>
               <div className="text-sm text-gray-500">
-                <p>Supported format: PDF only</p>
+                <p>Supported formats: PDF, CSV, XLSX</p>
                 <p>Maximum file size: 50MB</p>
               </div>
             </div>
@@ -401,16 +410,93 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
                 </div>
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">{selectedFile.name}</p>
-                  <p className="text-sm text-gray-600">{formatFileSize(selectedFile.size)}</p>
+                  <p className="text-sm text-gray-600">{formatFileSize(selectedFile.size)} • {fileType?.toUpperCase()}</p>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setSelectedFile(null)}
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setParsedData(null);
+                    setSelectedHeaderRow(null);
+                    setFileType(null);
+                  }}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <X className="h-4 w-4" />
                 </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Spreadsheet Preview & Header Selection */}
+          {parsedData && (fileType === 'csv' || fileType === 'xlsx') && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-medium text-gray-900">Select Header Row</h4>
+                <div className="text-sm text-gray-600">
+                  {parsedData.rows.length} data rows detected
+                </div>
+              </div>
+              
+              {/* Header Row Selection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium text-gray-700">
+                  Header Row (Detected: Row {selectedHeaderRow! + 1})
+                </Label>
+                <Select 
+                  value={selectedHeaderRow?.toString()} 
+                  onValueChange={(value) => setSelectedHeaderRow(parseInt(value))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select header row" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: Math.min(10, parsedData.rows.length + 1) }, (_, i) => {
+                      // Show first few rows for header selection
+                      const rowData = i === 0 ? parsedData.headers : parsedData.rows[i - 1];
+                      return (
+                        <SelectItem key={i} value={i.toString()}>
+                          Row {i + 1}: {rowData?.slice(0, 3).join(' | ')}...
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Data Preview */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b">
+                  <h5 className="text-sm font-medium text-gray-700">Data Preview</h5>
+                </div>
+                <div className="overflow-x-auto max-h-64">
+                  <table className="w-full text-sm">
+                    <thead className="bg-blue-50">
+                      <tr>
+                        {parsedData.headers.map((header, index) => (
+                          <th key={index} className="px-3 py-2 text-left font-medium text-blue-900 border-r border-blue-200 last:border-r-0">
+                            {header || `Column ${index + 1}`}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedData.rows.slice(0, 5).map((row, rowIndex) => (
+                        <tr key={rowIndex} className="border-b border-gray-200 last:border-b-0">
+                          {row.map((cell, cellIndex) => (
+                            <td key={cellIndex} className="px-3 py-2 border-r border-gray-200 last:border-r-0">
+                              {cell || '-'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="bg-gray-50 px-4 py-2 border-t text-xs text-gray-600">
+                  Showing first 5 rows of {parsedData.rows.length} total rows
+                </div>
               </div>
             </div>
           )}
@@ -489,10 +575,10 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
           </Button>
           <Button
             onClick={handleUpload}
-            disabled={!selectedFile || uploadState.isUploading || uploadState.isProcessing}
+            disabled={!canUpload}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            Upload Document
+            {getUploadButtonText()}
           </Button>
         </div>
       </DialogContent>
