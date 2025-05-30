@@ -304,9 +304,6 @@ export function CSVUploadWizard({
                   <span>Progress saved</span>
                 </div>
               )}
-              <Button variant="ghost" size="sm" onClick={handleClose}>
-                <X className="h-4 w-4" />
-              </Button>
             </div>
           </div>
 
