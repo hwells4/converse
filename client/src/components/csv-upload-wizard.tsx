@@ -34,13 +34,13 @@ interface FieldMapping {
 // Salesforce fields for commission statements - ordered by priority
 const SALESFORCE_FIELDS = [
   // Top priority fields
-  { value: "policy_name", label: "Policy Name" },
+  { value: "name_of_insured", label: "Name of Insured" },
   { value: "policy_number", label: "Policy Number", required: true },
   { value: "commission_amount", label: "Commission Amount", required: true },
   { value: "transaction_type", label: "Transaction Type" },
   
   // Other commonly used fields
-  { value: "name_of_insured", label: "Name of Insured" },
+  { value: "policy_name", label: "Policy Name" },
   { value: "policy_effective_date", label: "Policy Effective Date" },
   { value: "policy_expiration_date", label: "Policy Expiration Date" },
   { value: "commission_rate", label: "Commission Rate" },
