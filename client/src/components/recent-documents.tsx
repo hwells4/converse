@@ -10,7 +10,7 @@ import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink, ChevronDown,
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import type { Document } from "@/shared/schema";
+
 
 export function RecentDocuments() {
   const { data: documents, isLoading } = useDocuments();
