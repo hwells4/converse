@@ -79,7 +79,7 @@ export function SearchableSelect({
             value={search}
             onValueChange={setSearch}
           />
-          <CommandList className="max-h-[200px] overflow-y-auto">
+          <CommandList className="max-h-[400px] overflow-y-auto">
             <CommandEmpty>No carriers found.</CommandEmpty>
             <CommandGroup>
               {filteredOptions.map((option) => (
