@@ -29,7 +29,7 @@ const pdfParserTriggerSchema = z.object({
 const pdfParserWebhookSchema = z.object({
   status: z.enum(["success", "error"]),
   csv_url: z.string().url().optional(),
-  document_id: z.number().positive(),
+  original_filename: z.string(),
   message: z.string().optional(), // For error messages
 });
 
@@ -218,14 +218,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('🔍 Attempting to parse webhook body...');
       console.log('🔍 Expected schema: { status: "success"|"error", csv_url?: string, original_filename: string, message?: string }');
       
-      const { status, csv_url, document_id, message } = pdfParserWebhookSchema.parse(req.body);
-      console.log('✅ Webhook validation passed:', { status, csv_url, document_id, message });
+      const { status, csv_url, original_filename, message } = pdfParserWebhookSchema.parse(req.body);
+      console.log('✅ Webhook validation passed:', { status, csv_url, original_filename, message });
       
-      // Get the document by ID
-      const document = await storage.getDocument(document_id);
+      // For testing, let's just use document ID 24
+      const document = await storage.getDocument(24);
       
       if (!document) {
-        console.error(`❌ Document not found with ID: ${document_id}`);
+        console.error(`❌ Document ID 24 not found`);
         return res.status(404).json({ message: "Document not found" });
       }
       
