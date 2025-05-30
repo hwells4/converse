@@ -28,9 +28,9 @@ const pdfParserTriggerSchema = z.object({
 
 const pdfParserWebhookSchema = z.object({
   status: z.enum(["success", "error"]),
-  document_id: z.number().positive(),
   csv_url: z.string().url().optional(),
-  error_message: z.string().optional(),
+  original_filename: z.string(),
+  message: z.string().optional(), // For error messages
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -205,33 +205,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Log raw body for debugging
       console.log('🔍 Attempting to parse webhook body...');
-      console.log('🔍 Expected schema: { status: "success"|"error", document_id: number, csv_url?: string, error_message?: string }');
+      console.log('🔍 Expected schema: { status: "success"|"error", csv_url?: string, original_filename: string, message?: string }');
       
-      const { status, document_id, csv_url, error_message } = pdfParserWebhookSchema.parse(req.body);
-      console.log('✅ Webhook validation passed:', { status, document_id, csv_url, error_message });
+      const { status, csv_url, original_filename, message } = pdfParserWebhookSchema.parse(req.body);
+      console.log('✅ Webhook validation passed:', { status, csv_url, original_filename, message });
+      
+      // Find the document by original filename
+      const documents = await storage.getDocuments();
+      const document = documents.find(doc => 
+        doc.originalName === original_filename && 
+        doc.status === "processing"
+      );
+      
+      if (!document) {
+        console.error(`❌ Document not found for original filename: ${original_filename}`);
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      console.log(`📄 Found document ID ${document.id} for filename: ${original_filename}`);
       
       if (status === "success" && csv_url) {
-        // Extract CSV S3 key from the URL
-        const csvS3Key = csv_url.replace('https://converseinsurance.s3.us-east-2.amazonaws.com/', '');
+        // Extract CSV S3 key from the URL - handle different S3 URL formats
+        const csvS3Key = csv_url
+          .replace('https://converseinsurance.s3.us-east-2.amazonaws.com/', '')
+          .replace('https://s3.amazonaws.com/converseinsurance/', '')
+          .replace('https://s3-us-east-2.amazonaws.com/converseinsurance/', '');
         
         // Update document with success status and CSV location
-        await storage.updateDocument(document_id, {
+        await storage.updateDocument(document.id, {
           status: "review_pending",
           csvS3Key: csvS3Key,
           csvUrl: csv_url,
           processedAt: new Date(),
         });
         
-        console.log(`✅ Document ${document_id} updated with CSV: ${csvS3Key}`);
+        console.log(`✅ Document ${document.id} updated with CSV: ${csvS3Key}`);
         
       } else if (status === "error") {
         // Update document with error status
-        await storage.updateDocument(document_id, {
+        await storage.updateDocument(document.id, {
           status: "failed",
-          processingError: error_message || "PDF parsing failed",
+          processingError: message || "PDF parsing failed",
         });
         
-        console.log(`❌ Document ${document_id} marked as failed: ${error_message}`);
+        console.log(`❌ Document ${document.id} marked as failed: ${message}`);
       }
       
       res.json({ success: true, message: "Webhook processed successfully" });
