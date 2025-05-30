@@ -225,7 +225,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const documents = await storage.getDocuments();
       const document = documents.find(doc => 
         doc.originalName === original_filename && 
-        doc.status === "processing"
+        (doc.status === "processing" || doc.status === "uploaded")
       );
       
       if (!document) {

@@ -25,6 +25,14 @@ app.use((req, res, next) => {
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
+  // Log all webhook requests for debugging
+  if (path === '/api/pdf-parse-webhook') {
+    console.log('🔍 WEBHOOK REQUEST INTERCEPTED');
+    console.log('🔍 Method:', req.method);
+    console.log('🔍 Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('🔍 Body:', JSON.stringify(req.body, null, 2));
+  }
+
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
     capturedJsonResponse = bodyJson;
