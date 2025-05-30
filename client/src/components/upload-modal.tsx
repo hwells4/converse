@@ -313,7 +313,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     return documentType === "commission" ? "Commission Statement" : "Renewal Report";
   };
 
-  const canUpload = selectedFile && documentType && selectedCarrierId && !uploadState.isUploading && !uploadState.isProcessing;
+  const canUpload = selectedFile && documentType && selectedCarrierId && !uploadState.isUploading && !uploadState.isProcessing && (fileType === 'pdf' || (parsedData && selectedHeaderRow !== null));
   
   const getUploadButtonText = () => {
     if (fileType === 'csv' || fileType === 'xlsx') {
@@ -442,7 +442,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
           {parsedData && (fileType === 'csv' || fileType === 'xlsx') && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-lg font-medium text-gray-900">Select Header Row</h4>
+                <h4 className="text-lg font-medium text-gray-900">Spreadsheet Preview</h4>
                 <div className="text-sm text-gray-600">
                   {parsedData.rows.length} data rows detected
                 </div>
@@ -451,19 +451,32 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
               {/* Header Row Selection */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-gray-700">
-                  Header Row (Detected: Row {selectedHeaderRow! + 1})
+                  Header Row (Auto-detected: Row {selectedHeaderRow! + 1})
                 </Label>
                 <Select 
                   value={selectedHeaderRow?.toString()} 
-                  onValueChange={(value) => setSelectedHeaderRow(parseInt(value))}
+                  onValueChange={(value) => {
+                    const newHeaderRow = parseInt(value);
+                    setSelectedHeaderRow(newHeaderRow);
+                    // Re-parse data with new header row
+                    const newHeaders = parsedData.rows[newHeaderRow] || parsedData.headers;
+                    const newDataRows = parsedData.rows.slice(newHeaderRow + 1);
+                    setParsedData(prev => prev ? {
+                      ...prev,
+                      headers: newHeaders,
+                      rows: newDataRows,
+                      detectedHeaderRow: newHeaderRow
+                    } : null);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select header row" />
                   </SelectTrigger>
                   <SelectContent>
                     {Array.from({ length: Math.min(10, parsedData.rows.length + 1) }, (_, i) => {
-                      // Show first few rows for header selection
-                      const rowData = i === 0 ? parsedData.headers : parsedData.rows[i - 1];
+                      // Show actual row data for selection
+                      const allRows = [parsedData.headers, ...parsedData.rows];
+                      const rowData = allRows[i];
                       return (
                         <SelectItem key={i} value={i.toString()}>
                           Row {i + 1}: {rowData?.slice(0, 3).join(' | ')}...
