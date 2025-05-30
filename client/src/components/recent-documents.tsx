@@ -5,19 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { CSVPreview } from "./csv-preview";
 import { FieldMappingModal } from "./field-mapping-modal";
 import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink, ChevronDown, CheckCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import type { Document } from "@/shared/schema";
 
 export function RecentDocuments() {
   const { data: documents, isLoading } = useDocuments();
   const deleteDocument = useDeleteDocument();
   const { toast } = useToast();
-  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
-  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewDocumentId, setReviewDocumentId] = useState<number | null>(null);
   const [deletingDocumentId, setDeletingDocumentId] = useState<number | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean;
@@ -176,8 +175,8 @@ export function RecentDocuments() {
       </Button>
     );
 
-    // Actions based on document status
-    if ((document.status === "processed" || document.status === "review_pending") && document.csvUrl) {
+    // Actions based on document status - Show review for all processed documents
+    if (document.status === "processed" || document.status === "review_pending") {
       return (
         <div className="flex items-center space-x-1">
           {/* Primary Action Button */}
@@ -185,8 +184,7 @@ export function RecentDocuments() {
             <Button
               size="sm"
               onClick={() => {
-                setSelectedDocumentId(document.id);
-                setShowReviewModal(true);
+                setReviewDocumentId(document.id);
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
             >
@@ -197,8 +195,7 @@ export function RecentDocuments() {
             <Button
               size="sm"
               onClick={() => {
-                setSelectedDocumentId(document.id);
-                setShowReviewModal(false);
+                setReviewDocumentId(document.id);
               }}
               className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
             >
@@ -217,8 +214,7 @@ export function RecentDocuments() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onClick={() => {
-                  setSelectedDocumentId(document.id);
-                  setShowReviewModal(false);
+                  setReviewDocumentId(document.id);
                 }}
                 className="cursor-pointer"
               >
@@ -274,25 +270,12 @@ export function RecentDocuments() {
     );
   };
 
-  if (selectedDocumentId && showReviewModal) {
+  if (reviewDocumentId) {
     return (
       <FieldMappingModal 
-        documentId={selectedDocumentId} 
+        documentId={reviewDocumentId} 
         onClose={() => {
-          setSelectedDocumentId(null);
-          setShowReviewModal(false);
-        }} 
-      />
-    );
-  }
-
-  if (selectedDocumentId && !showReviewModal) {
-    return (
-      <CSVPreview 
-        documentId={selectedDocumentId} 
-        onClose={() => {
-          setSelectedDocumentId(null);
-          setShowReviewModal(false);
+          setReviewDocumentId(null);
         }} 
       />
     );
