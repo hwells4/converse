@@ -139,19 +139,41 @@ export type N8NWebhookPayload = z.infer<typeof n8nWebhookPayloadSchema>;
 
 // N8N completion webhook schema
 export const n8nCompletionWebhookSchema = z.object({
-  documentId: z.number(),
-  carrierId: z.number(),
-  carrierName: z.string(),
-  numberOfSuccessful: z.number(),
-  totalTransactions: z.number(),
-  failedTransactions: z.array(z.object({
-    policyNumber: z.string().optional(),
-    nameOfInsured: z.string().optional(),
-    commissionAmount: z.string().optional(),
-    error: z.string(),
-    rowIndex: z.number().optional(),
-  })).optional(),
+  success: z.boolean(),
   message: z.string(),
+  document: z.object({
+    id: z.number(),
+    filename: z.string(),
+    originalName: z.string(),
+    documentType: z.string(),
+    carrierId: z.number(),
+    s3Key: z.string(),
+    s3Url: z.string(),
+    fileSize: z.number(),
+    status: z.string(),
+    textractJobId: z.string().nullable(),
+    csvS3Key: z.string(),
+    csvUrl: z.string(),
+    jsonS3Key: z.string().nullable(),
+    jsonUrl: z.string().nullable(),
+    processingError: z.string().nullable(),
+    metadata: z.object({
+      completionData: z.object({
+        message: z.string(),
+        carrierName: z.string(),
+        completedAt: z.string(),
+        totalTransactions: z.number(),
+        failedTransactions: z.array(z.any()),
+        numberOfSuccessful: z.number(),
+      })
+    }),
+    uploadedAt: z.string(),
+    processedAt: z.string(),
+  })
 });
 
+// Support both single completion and array format from N8N
+export const n8nCompletionWebhookArraySchema = z.array(n8nCompletionWebhookSchema);
+
 export type N8NCompletionWebhook = z.infer<typeof n8nCompletionWebhookSchema>;
+export type N8NCompletionWebhookArray = z.infer<typeof n8nCompletionWebhookArraySchema>;

@@ -92,11 +92,25 @@ export default function Documents() {
             Uploaded to Salesforce
           </Badge>
         );
+      case "completed":
+        return (
+          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+            Completed
+          </Badge>
+        );
       case "processing":
         return (
           <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
             <div className="w-2 h-2 bg-yellow-500 rounded-full mr-1 animate-pulse"></div>
             Processing
+          </Badge>
+        );
+      case "uploading":
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+            <div className="w-2 h-2 bg-yellow-500 rounded-full mr-1 animate-pulse"></div>
+            Uploading
           </Badge>
         );
       case "review_pending":
@@ -260,8 +274,10 @@ export default function Documents() {
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="uploaded">Uploaded</SelectItem>
                   <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="uploading">Uploading</SelectItem>
                   <SelectItem value="review_pending">Review Pending</SelectItem>
                   <SelectItem value="processed">Processed</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="failed">Failed</SelectItem>
                 </SelectContent>
               </Select>

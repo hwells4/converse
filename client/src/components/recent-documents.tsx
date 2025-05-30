@@ -10,6 +10,7 @@ import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink, ChevronDown,
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import type { Document as DocumentType } from "@shared/schema";
 
 
 export function RecentDocuments() {
@@ -74,19 +75,37 @@ export function RecentDocuments() {
   });
   
   // Track previous document statuses to detect changes
-  const previousDocuments = useRef<Document[]>([]);
+  const previousDocuments = useRef<DocumentType[]>([]);
   
   // Check for status changes and show notifications
   useEffect(() => {
     if (documents && previousDocuments.current.length > 0) {
       documents.forEach((currentDoc) => {
         const previousDoc = previousDocuments.current.find(doc => doc.id === currentDoc.id);
-        if (previousDoc && previousDoc.status !== currentDoc.status && currentDoc.status === 'review_pending') {
-          toast({
-            title: "Document Processing Complete",
-            description: `${currentDoc.originalName || currentDoc.filename} is ready for review.`,
-            variant: "default",
-          });
+        if (previousDoc && previousDoc.status !== currentDoc.status) {
+          // Notification for review pending
+          if (currentDoc.status === 'review_pending') {
+            toast({
+              title: "Document Processing Complete",
+              description: `${currentDoc.originalName || currentDoc.filename} is ready for review.`,
+              variant: "default",
+            });
+          }
+          // Notification for completed status
+          else if (currentDoc.status === 'completed') {
+            const completionData = (currentDoc.metadata as any)?.completionData;
+            let description = `${currentDoc.originalName || currentDoc.filename} has been completed successfully.`;
+            
+            if (completionData) {
+              description = completionData.message || description;
+            }
+            
+            toast({
+              title: "Document Upload Complete",
+              description,
+              variant: "default",
+            });
+          }
         }
       });
     }
@@ -116,11 +135,25 @@ export function RecentDocuments() {
             Uploaded to Salesforce
           </Badge>
         );
+      case "completed":
+        return (
+          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+            Completed
+          </Badge>
+        );
       case "processing":
         return (
           <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
             <div className="w-2 h-2 bg-yellow-500 rounded-full mr-1 animate-pulse"></div>
             Processing
+          </Badge>
+        );
+      case "uploading":
+        return (
+          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
+            <div className="w-2 h-2 bg-yellow-500 rounded-full mr-1 animate-pulse"></div>
+            Uploading
           </Badge>
         );
       case "failed":

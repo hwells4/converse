@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDocumentSchema, updateDocumentSchema, insertCarrierSchema, webhookDocumentProcessedSchema, pdfParserWebhookSchema, n8nWebhookPayloadSchema, n8nCompletionWebhookSchema } from "@shared/schema";
+import { insertDocumentSchema, updateDocumentSchema, insertCarrierSchema, webhookDocumentProcessedSchema, pdfParserWebhookSchema, n8nWebhookPayloadSchema, n8nCompletionWebhookSchema, n8nCompletionWebhookArraySchema } from "@shared/schema";
 import { BackendAWSService } from "./aws-service";
 import { z } from "zod";
 
@@ -763,47 +763,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
     
     try {
-      // Validate webhook payload
-      const validatedPayload = n8nCompletionWebhookSchema.parse(req.body);
-      console.log('✅ N8N completion webhook payload validation passed');
+      // Handle both array and single object formats
+      let payloadArray: any[];
       
-      // Update document status to completed
-      const updatedDocument = await storage.updateDocument(validatedPayload.documentId, {
-        status: "completed",
-        metadata: {
-          completionData: {
-            carrierName: validatedPayload.carrierName,
-            numberOfSuccessful: validatedPayload.numberOfSuccessful,
-            totalTransactions: validatedPayload.totalTransactions,
-            failedTransactions: validatedPayload.failedTransactions || [],
-            message: validatedPayload.message,
-            completedAt: new Date().toISOString()
+      if (Array.isArray(req.body)) {
+        // Validate as array
+        const validatedArray = n8nCompletionWebhookArraySchema.parse(req.body);
+        payloadArray = validatedArray;
+      } else {
+        // Validate as single object
+        const validatedPayload = n8nCompletionWebhookSchema.parse(req.body);
+        payloadArray = [validatedPayload];
+      }
+      
+      console.log(`📊 Processing ${payloadArray.length} completion notification(s)`);
+      
+      const results = [];
+      
+      for (const payload of payloadArray) {
+        try {
+          console.log('✅ N8N completion webhook payload validation passed for document:', payload.document.id);
+          
+          const documentId = payload.document.id;
+          const completionData = payload.document.metadata.completionData;
+          
+          // Update document status to completed with metadata
+          const updatedDocument = await storage.updateDocument(documentId, {
+            status: "completed",
+            metadata: {
+              completionData: {
+                carrierName: completionData.carrierName,
+                numberOfSuccessful: completionData.numberOfSuccessful,
+                totalTransactions: completionData.totalTransactions,
+                failedTransactions: completionData.failedTransactions || [],
+                message: completionData.message,
+                completedAt: completionData.completedAt
+              }
+            }
+          });
+
+          if (!updatedDocument) {
+            console.error('❌ Document not found for ID:', documentId);
+            results.push({ 
+              documentId,
+              success: false, 
+              message: "Document not found" 
+            });
+            continue;
           }
+
+          console.log(`✅ Document ${documentId} marked as completed`);
+          console.log(`📊 Upload results: ${completionData.numberOfSuccessful}/${completionData.totalTransactions} successful`);
+          
+          if (completionData.failedTransactions && completionData.failedTransactions.length > 0) {
+            console.log(`⚠️ ${completionData.failedTransactions.length} transactions failed`);
+          }
+
+          results.push({
+            documentId,
+            success: true,
+            message: "Document status updated to completed",
+            document: updatedDocument
+          });
+          
+        } catch (payloadError) {
+          console.error('❌ Error processing individual completion payload:', payloadError);
+          results.push({
+            success: false,
+            message: "Failed to process individual completion",
+            error: payloadError instanceof Error ? payloadError.message : "Unknown error"
+          });
         }
-      });
-
-      if (!updatedDocument) {
-        console.error('❌ Document not found for ID:', validatedPayload.documentId);
-        return res.status(404).json({ 
-          success: false, 
-          message: "Document not found" 
-        });
       }
-
-      console.log(`✅ Document ${validatedPayload.documentId} marked as completed`);
-      console.log(`📊 Upload results: ${validatedPayload.numberOfSuccessful}/${validatedPayload.totalTransactions} successful`);
       
-      if (validatedPayload.failedTransactions && validatedPayload.failedTransactions.length > 0) {
-        console.log(`⚠️ ${validatedPayload.failedTransactions.length} transactions failed`);
-      }
-
+      // Return results
+      const allSuccessful = results.every(r => r.success);
+      
       res.json({ 
-        success: true, 
-        message: "Document status updated to completed",
-        document: updatedDocument
+        success: allSuccessful,
+        message: allSuccessful ? "All documents processed successfully" : "Some documents failed to process",
+        results
       });
+      
     } catch (error) {
       console.error('❌ Error processing N8N completion webhook:', error);
+      
+      if (error instanceof z.ZodError) {
+        console.error('❌ Webhook validation errors:', JSON.stringify(error.errors, null, 2));
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid webhook payload", 
+          errors: error.errors,
+          receivedPayload: req.body
+        });
+      }
+      
       res.status(500).json({ 
         success: false,
         message: "Failed to process completion webhook",
