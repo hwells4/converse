@@ -581,7 +581,7 @@ export function CSVUploadWizard({
                     </span>
                   </div>
                 </div>
-                <ScrollArea style={{ height: 'calc(100vh - 400px)' }}>
+                <div className="overflow-auto" style={{ height: 'calc(100vh - 400px)' }}>
                   <table className="w-full">
                     <thead className="bg-gray-50 sticky top-0">
                       <tr className={selectedHeaderRow === -1 ? 'bg-blue-100 border-2 border-blue-400' : ''}>
@@ -726,7 +726,7 @@ export function CSVUploadWizard({
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
+                </div>
               </div>
             </div>
           )}
@@ -748,7 +748,7 @@ export function CSVUploadWizard({
 
               {/* Main editing interface - fills remaining space */}
               <div className="flex-1 mx-4 mb-4 border border-t-0 rounded-b-lg overflow-hidden bg-white">
-                <div className="overflow-auto h-full">
+                <ScrollArea className="h-full">
                   <table className="w-full">
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
@@ -797,7 +797,7 @@ export function CSVUploadWizard({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollArea>
               </div>
             </div>
           )}
