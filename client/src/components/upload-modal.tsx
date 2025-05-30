@@ -237,11 +237,11 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     if (!selectedFile || (fileType !== 'csv' && fileType !== 'xlsx')) return;
     
     try {
-      // Parse the spreadsheet file now that upload is confirmed
+      // Parse the spreadsheet file and go directly to the unified wizard
       const parsed = await parseSpreadsheetFile(selectedFile);
       setParsedData(parsed);
       setSelectedHeaderRow(parsed.detectedHeaderRow);
-      setShowSpreadsheetPreview(true);
+      setShowFieldMapping(true); // Show the unified wizard
     } catch (error) {
       toast({
         title: "File Parse Error",
