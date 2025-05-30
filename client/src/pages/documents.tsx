@@ -371,7 +371,7 @@ export default function Documents() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {/* Actions based on document status - Show review for all processed documents */}
-                        {(document.status === "processed" || document.status === "review_pending") ? (
+                        {(document.status === "processed" || document.status === "review_pending" || document.status === "uploaded_to_salesforce") ? (
                           <div className="flex items-center space-x-1">
                             {/* Primary Action Button */}
                             {document.status === "review_pending" ? (

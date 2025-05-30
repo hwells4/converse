@@ -1077,7 +1077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let processingError: string | null = null;
 
       if (status === "success") {
-        newStatus = "completed";
+        newStatus = "uploaded_to_salesforce";
         console.log(`✅ Document ${documentId} successfully uploaded to Salesforce`);
       } else if (status === "error" || status === "failed") {
         newStatus = "salesforce_upload_failed";
