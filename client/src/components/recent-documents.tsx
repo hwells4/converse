@@ -109,6 +109,13 @@ export function RecentDocuments() {
             Processed
           </Badge>
         );
+      case "uploaded_to_salesforce":
+        return (
+          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+            Uploaded to Salesforce
+          </Badge>
+        );
       case "processing":
         return (
           <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
@@ -221,7 +228,7 @@ export function RecentDocuments() {
     );
 
     // Actions based on document status - Show review for all processed documents
-    if (document.status === "processed" || document.status === "review_pending") {
+    if (document.status === "processed" || document.status === "review_pending" || document.status === "uploaded_to_salesforce") {
       return (
         <div className="flex items-center space-x-1">
           {/* Primary Action Button */}

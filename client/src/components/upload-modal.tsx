@@ -41,6 +41,35 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
   const { data: carriers, isLoading: carriersLoading } = useCarriers();
   const { toast } = useToast();
 
+  // Show "Coming Soon" message for renewal reports
+  if (documentType === "renewal") {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+              <FileText className="h-6 w-6 text-green-600" />
+              Renewal Reports
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-8 text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FileText className="h-8 w-8 text-green-600" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Coming Soon!</h3>
+            <p className="text-gray-600 text-sm mb-6">
+              Currently, we only support commission statements. Renewal report processing will be available in a future update.
+            </p>
+            <Button onClick={onClose} className="w-full">
+              Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const sanitizeFileName = (fileName: string): string => {
     // Remove file extension
     const nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");

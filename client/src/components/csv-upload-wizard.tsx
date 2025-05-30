@@ -80,7 +80,8 @@ export function CSVUploadWizard({
     if (parsedData) {
       setHeaders(parsedData.headers);
       setDataRows(parsedData.rows);
-      setSelectedHeaderRow(parsedData.detectedHeaderRow);
+      // Always default to "headers are correct" (-1) regardless of detected header row
+      setSelectedHeaderRow(-1);
     }
   }, [parsedData]);
 

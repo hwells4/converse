@@ -85,6 +85,13 @@ export default function Documents() {
             Processed
           </Badge>
         );
+      case "uploaded_to_salesforce":
+        return (
+          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+            Uploaded to Salesforce
+          </Badge>
+        );
       case "processing":
         return (
           <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
