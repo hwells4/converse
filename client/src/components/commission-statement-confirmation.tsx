@@ -98,7 +98,14 @@ export function CommissionStatementConfirmation({
 
     setIsSubmitting(true);
     try {
-      await onConfirm(statementData);
+      // Ensure carrier name is set from the fetched carrier data
+      const finalStatementData = {
+        ...statementData,
+        carrierName: carrier?.name || statementData.carrierName
+      };
+      
+      console.log("Submitting statement data:", finalStatementData);
+      await onConfirm(finalStatementData);
     } catch (error) {
       console.error("Error submitting statement:", error);
       toast({
