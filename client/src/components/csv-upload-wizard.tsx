@@ -426,43 +426,36 @@ export function CSVUploadWizard({
           )}
 
           {currentStep === 'mapping' && (
-            <div className="p-8 space-y-6">
-              {/* Quick mapping suggestions */}
-              <Card className="bg-green-50 border-green-200">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg text-green-800 flex items-center space-x-2">
-                    <Check className="h-5 w-5" />
-                    <span>Smart Mapping Suggestions</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-green-700 text-sm mb-3">
-                    We've automatically suggested mappings based on your column names. Review and adjust as needed.
-                  </p>
-                  <div className="flex items-center space-x-4">
+            <div className="p-6 space-y-4">
+              {/* Quick mapping suggestions - compressed */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span className="font-medium text-green-800">Smart Auto-Mapping Applied</span>
                     <Badge variant="outline" className="bg-white text-green-700 border-green-300">
-                      {getMappedFieldsCount()} of {headers.length} fields mapped
+                      {getMappedFieldsCount()} of {headers.length} mapped
                     </Badge>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => {
-                        const autoMapping: FieldMapping = {};
-                        headers.forEach((header, index) => {
-                          const suggestion = getSuggestedMapping(header);
-                          if (suggestion) {
-                            autoMapping[index] = suggestion;
-                          }
-                        });
-                        setFieldMapping(autoMapping);
-                      }}
-                      className="text-green-700 border-green-300 hover:bg-green-100"
-                    >
-                      Re-run Auto Mapping
-                    </Button>
                   </div>
-                </CardContent>
-              </Card>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      const autoMapping: FieldMapping = {};
+                      headers.forEach((header, index) => {
+                        const suggestion = getSuggestedMapping(header);
+                        if (suggestion) {
+                          autoMapping[index] = suggestion;
+                        }
+                      });
+                      setFieldMapping(autoMapping);
+                    }}
+                    className="text-green-700 border-green-300 hover:bg-green-100"
+                  >
+                    Re-run Auto Mapping
+                  </Button>
+                </div>
+              </div>
 
               {/* Main mapping interface */}
               <Card>
@@ -542,28 +535,7 @@ export function CSVUploadWizard({
                       </ScrollArea>
                     </div>
 
-                    {/* Mapping summary */}
-                    {getMappedFieldsCount() > 0 && (
-                      <Card className="bg-blue-50 border-blue-200">
-                        <CardContent className="pt-4">
-                          <h4 className="font-medium text-blue-900 mb-3">Mapping Summary</h4>
-                          <div className="grid grid-cols-2 gap-4">
-                            {Object.entries(fieldMapping).filter(([_, field]) => field !== 'none').map(([headerIndex, salesforceField]) => {
-                              const header = headers[parseInt(headerIndex)];
-                              const fieldLabel = SALESFORCE_FIELDS.find(f => f.value === salesforceField)?.label;
-                              
-                              return (
-                                <div key={headerIndex} className="flex items-center space-x-2 text-sm bg-white p-2 rounded border">
-                                  <span className="font-medium text-gray-700">{header}</span>
-                                  <ArrowRight className="h-3 w-3 text-gray-400" />
-                                  <span className="text-blue-700">{fieldLabel}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
+
                   </div>
                 </CardContent>
               </Card>
