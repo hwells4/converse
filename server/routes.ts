@@ -159,11 +159,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('📤 Sending request to PDF parser service:', parserPayload);
       
-      // Send request to Railway PDF parser service
+      // Send request to Railway PDF parser service with API key authentication
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
+        console.error('❌ API_KEY environment variable not set');
+        throw new Error('API key not configured for PDF parser service');
+      }
+
       const response = await fetch('https://pdfparser-production-f216.up.railway.app/parse', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
         },
         body: JSON.stringify(parserPayload),
       });
@@ -171,6 +178,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ PDF parser service error:', errorText);
+        
+        if (response.status === 401) {
+          console.error('❌ Authentication failed - invalid API key');
+          throw new Error('PDF parser service authentication failed - invalid API key');
+        }
+        
         throw new Error(`PDF parser service error: ${response.status} ${errorText}`);
       }
       
