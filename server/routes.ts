@@ -149,8 +149,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { s3Key, documentType, carrierId, documentId } = pdfParserTriggerSchema.parse(req.body);
       console.log('✅ PDF parser request validation passed:', { s3Key, documentType, carrierId, documentId });
       
-      // Construct webhook URL
-      const webhookUrl = `${req.protocol}://${req.get('host')}/api/pdf-parse-webhook`;
+      // Construct webhook URL - force HTTPS for external services
+      const protocol = req.get('host')?.includes('replit.dev') ? 'https' : req.protocol;
+      const webhookUrl = `${protocol}://${req.get('host')}/api/pdf-parse-webhook`;
       console.log('🔗 Webhook URL:', webhookUrl);
       
       // Prepare request payload for Railway PDF parser service
@@ -196,7 +197,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PDF Parser webhook endpoint
   app.post("/api/pdf-parse-webhook", async (req, res) => {
     console.log('🔵 Received PDF parser webhook');
+    console.log('🔵 Request headers:', JSON.stringify(req.headers, null, 2));
     console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
+    console.log('🔵 Raw body type:', typeof req.body);
+    console.log('🔵 Request IP:', req.ip || req.connection.remoteAddress);
     
     try {
       const { status, document_id, csv_url, error_message } = pdfParserWebhookSchema.parse(req.body);
