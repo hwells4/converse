@@ -6,6 +6,7 @@ import { z } from "zod";
 export const carriers = pgTable("carriers", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  salesforceId: text("salesforce_id").notNull().unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
