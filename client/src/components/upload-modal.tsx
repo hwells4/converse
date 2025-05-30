@@ -15,7 +15,7 @@ import { Upload, FileText, X, Check, AlertCircle, Calendar, Building2 } from "lu
 import { format } from "date-fns";
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
-import { SpreadsheetFieldMapping } from "./spreadsheet-field-mapping";
+import { CSVUploadWizard } from "./csv-upload-wizard";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -224,7 +224,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
       
       // For CSV/XLSX files, we'll need to handle differently
       if (fileType === 'csv' || fileType === 'xlsx') {
-        // Skip AWS upload for CSV/XLSX and go directly to field mapping
+        // Skip AWS upload for CSV/XLSX and go directly to the unified wizard
         await handleSpreadsheetUpload();
       } else {
         // PDF files go through the normal AWS flow
@@ -251,15 +251,9 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     }
   };
 
-  const handleFieldMappingComplete = async (fieldMapping: any) => {
+  const handleFieldMappingComplete = async (wizardResult: any) => {
     // TODO: Send data to Salesforce via N8N webhook
-    console.log("Field mapping complete, ready for Salesforce:", {
-      headers: parsedData!.headers,
-      rows: parsedData!.rows,
-      fieldMapping,
-      fileName: generateFileName(selectedFile!.name, customFileName),
-      carrierId: selectedCarrierId
-    });
+    console.log("CSV upload wizard complete, ready for Salesforce:", wizardResult);
     
     toast({
       title: "Success",
@@ -683,16 +677,15 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Spreadsheet Field Mapping Modal */}
+      {/* CSV Upload Wizard */}
       {parsedData && (
-        <SpreadsheetFieldMapping
+        <CSVUploadWizard
           isOpen={showFieldMapping}
           onClose={() => setShowFieldMapping(false)}
-          headers={parsedData.headers}
-          sampleData={parsedData.rows.slice(0, 3)} // First 3 rows as sample
+          parsedData={parsedData}
           fileName={generateFileName(selectedFile?.name || '', customFileName)}
           carrierId={parseInt(selectedCarrierId)}
-          onProceedToSalesforce={handleFieldMappingComplete}
+          onComplete={handleFieldMappingComplete}
         />
       )}
     </Dialog>
