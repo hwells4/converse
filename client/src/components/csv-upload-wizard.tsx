@@ -581,7 +581,7 @@ export function CSVUploadWizard({
                     </span>
                   </div>
                 </div>
-                <div className="overflow-auto" style={{ height: 'calc(100vh - 400px)' }}>
+                <ScrollArea style={{ height: 'calc(100vh - 400px)' }}>
                   <table className="w-full">
                     <thead className="bg-gray-50 sticky top-0">
                       <tr className={selectedHeaderRow === -1 ? 'bg-blue-100 border-2 border-blue-400' : ''}>
@@ -625,7 +625,7 @@ export function CSVUploadWizard({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollArea>
               </div>
             </div>
           )}
@@ -676,7 +676,7 @@ export function CSVUploadWizard({
                     <div>Status</div>
                   </div>
                 </div>
-                <div className="overflow-auto flex-1 min-h-0">
+                <ScrollArea className="flex-1 min-h-0">
                   <div className="space-y-0">
                     {headers.map((header, index) => (
                       <div key={index} className="px-6 py-4 border-b border-gray-100 hover:bg-gray-50">
@@ -726,7 +726,7 @@ export function CSVUploadWizard({
                       </div>
                     ))}
                   </div>
-                </div>
+                </ScrollArea>
               </div>
             </div>
           )}
