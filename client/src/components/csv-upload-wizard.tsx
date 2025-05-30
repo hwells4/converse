@@ -56,14 +56,17 @@ export function CSVUploadWizard({
   parsedData, 
   fileName, 
   carrierId,
+  documentId,
   onComplete 
 }: CSVUploadWizardProps) {
-  const [currentStep, setCurrentStep] = useState<'preview' | 'mapping' | 'edit'>(parsedData ? 'preview' : 'preview');
+  const { toast } = useToast();
+  const [currentStep, setCurrentStep] = useState<'preview' | 'mapping' | 'edit' | 'confirmation'>(parsedData ? 'preview' : 'preview');
   const [selectedHeaderRow, setSelectedHeaderRow] = useState<number>(-1); // Default to "headers are correct"
   const [headers, setHeaders] = useState<string[]>(parsedData?.headers || []);
   const [dataRows, setDataRows] = useState<string[][]>(parsedData?.rows || []);
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>({});
   const [editableData, setEditableData] = useState<any[]>([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   
   // Cache key for localStorage
   const cacheKey = `csv-wizard-${fileName}-${carrierId}`;
@@ -255,13 +258,46 @@ export function CSVUploadWizard({
   };
 
   const handleComplete = () => {
-    clearCache(); // Clear cache on successful completion
-    onComplete({
-      mapping: fieldMapping,
-      data: editableData,
-      fileName,
-      carrierId
-    });
+    // Show the confirmation modal instead of directly completing
+    setShowConfirmation(true);
+  };
+
+  const handleConfirmationSubmit = async (statement: CommissionStatement) => {
+    try {
+      // Prepare the N8N webhook payload
+      const payload: N8NWebhookPayload = {
+        statement,
+        transactions: editableData,
+        transactionCount: editableData.length,
+        documentId: documentId || 0,
+        fileName
+      };
+
+      // Send to N8N webhook
+      await apiRequest("POST", "/api/n8n/salesforce-upload", payload);
+
+      toast({
+        title: "Upload Successful",
+        description: `Commission statement and ${editableData.length} transactions sent to Salesforce.`,
+      });
+
+      clearCache(); // Clear cache on successful completion
+      setShowConfirmation(false);
+      onComplete({
+        mapping: fieldMapping,
+        data: editableData,
+        fileName,
+        carrierId,
+        statement
+      });
+    } catch (error) {
+      console.error("Failed to upload to Salesforce:", error);
+      toast({
+        title: "Upload Failed",
+        description: "Failed to send data to Salesforce. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Handle modal close with cache cleanup option
@@ -680,13 +716,25 @@ export function CSVUploadWizard({
                   className="bg-green-600 hover:bg-green-700"
                 >
                   <Upload className="h-4 w-4 mr-1" />
-                  Upload to Salesforce
+                  Review & Confirm Upload
                 </Button>
               )}
             </div>
           </div>
         </div>
       </DialogContent>
+
+      {/* Commission Statement Confirmation Modal */}
+      <CommissionStatementConfirmation
+        isOpen={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        onBack={() => setShowConfirmation(false)}
+        carrierId={carrierId}
+        fileName={fileName}
+        documentId={documentId || 0}
+        mappedTransactions={editableData}
+        onConfirm={handleConfirmationSubmit}
+      />
     </Dialog>
   );
 }
