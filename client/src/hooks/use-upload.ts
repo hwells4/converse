@@ -146,27 +146,27 @@ export function useUpload() {
 
         return document; // Return document for field mapping
       } else {
-        // For PDF files, trigger Textract processing
+        // For PDF files, trigger PDF parsing service
         setUploadState(prev => ({ ...prev, isProcessing: true }));
         
         try {
-          const jobId = await AWSService.triggerTextractLambda({ 
+          await AWSService.triggerPDFParser({ 
             s3Key, 
             documentType, 
-            carrierId 
+            carrierId,
+            documentId: document.id
           });
           
           await updateDocument.mutateAsync({
             id: document.id,
             updates: {
               status: "processing",
-              textractJobId: jobId,
             },
           });
 
           toast({
             title: "Upload Successful",
-            description: `${documentType === "commission" ? "Commission Statement" : "Renewal Report"} uploaded and processing started.`,
+            description: `${documentType === "commission" ? "Commission Statement" : "Renewal Report"} uploaded and parsing started.`,
           });
 
           // Start polling for results using document status

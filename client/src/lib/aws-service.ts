@@ -20,6 +20,13 @@ export interface LambdaInvocationParams {
   carrierId: number;
 }
 
+export interface PDFParserParams {
+  s3Key: string;
+  documentType: "commission" | "renewal";
+  carrierId: number;
+  documentId: number;
+}
+
 export class AWSService {
   private static apiBaseUrl = 'https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev';
 
