@@ -365,57 +365,60 @@ export function CSVUploadWizard({
         {/* Step Content */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {currentStep === 'preview' && (
-            <div className="p-4 flex-1 flex flex-col space-y-3">
-              {/* Header Selection - Compressed */}
-              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-blue-900 text-sm">Header Row Selection</h4>
-                  <Badge variant="outline" className="text-blue-700 text-xs">Optional</Badge>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <label className="text-xs font-medium text-blue-900">Header Row:</label>
-                  <Select value={selectedHeaderRow.toString()} onValueChange={(value) => handleHeaderRowChange(parseInt(value))}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {dataRows.slice(0, 5).map((row, index) => (
-                        <SelectItem key={index} value={index.toString()}>
-                          Row {index + 1}: {row.slice(0, 3).join(', ')}...
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            <div className="p-4 flex-1 flex flex-col space-y-4">
+              {/* Clear Explanation */}
+              <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg">
+                <h3 className="font-semibold text-blue-900 mb-2">What are we doing here?</h3>
+                <p className="text-blue-800 text-sm leading-relaxed mb-3">
+                  We need to check your data and make sure we can read it correctly. Look at the table below to see if it looks right. 
+                  If the column names (like "Policy Number" or "Customer Name") are not in the first row, you can pick which row has the correct column names.
+                </p>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-medium text-blue-900">Which row has your column names?</span>
+                    <Select value={selectedHeaderRow.toString()} onValueChange={(value) => handleHeaderRowChange(parseInt(value))}>
+                      <SelectTrigger className="w-40 bg-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {dataRows.slice(0, 5).map((row, index) => (
+                          <SelectItem key={index} value={index.toString()}>
+                            Row {index + 1}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button 
                     size="sm"
                     variant="outline" 
                     onClick={() => setCurrentStep('mapping')}
                     className="text-blue-600 border-blue-300 hover:bg-blue-50"
                   >
-                    Skip to Mapping
+                    This looks good, continue →
                   </Button>
                 </div>
               </div>
 
-              {/* Data Preview - Compressed */}
-              <div className="flex-1 border rounded-lg overflow-hidden">
-                <div className="bg-gray-50 px-3 py-2 border-b">
+              {/* Data Preview - Expanded */}
+              <div className="flex-1 border rounded-lg overflow-hidden bg-white">
+                <div className="bg-gray-50 px-4 py-3 border-b">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-gray-900 text-sm flex items-center">
+                    <h3 className="font-medium text-gray-900 flex items-center">
                       <Eye className="h-4 w-4 mr-2" />
-                      Data Preview
+                      Your Data Preview
                     </h3>
-                    <span className="text-xs text-gray-600">
-                      Showing first 20 rows • Total: {dataRows.length - selectedHeaderRow - 1} rows
+                    <span className="text-sm text-gray-600">
+                      Showing 20 of {dataRows.length - selectedHeaderRow - 1} total rows
                     </span>
                   </div>
                 </div>
-                <ScrollArea className="h-[300px]">
+                <ScrollArea className="flex-1" style={{ height: 'calc(100vh - 400px)' }}>
                   <table className="w-full">
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
                         {headers.map((header, index) => (
-                          <th key={index} className="px-3 py-2 text-left text-xs font-medium text-gray-900 border-r">
+                          <th key={index} className="px-4 py-3 text-left text-sm font-medium text-gray-900 border-r">
                             {header || `Column ${index + 1}`}
                           </th>
                         ))}
@@ -425,8 +428,10 @@ export function CSVUploadWizard({
                       {dataRows.slice(selectedHeaderRow + 1, selectedHeaderRow + 21).map((row, rowIndex) => (
                         <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           {row.map((cell, cellIndex) => (
-                            <td key={cellIndex} className="px-3 py-2 text-xs text-gray-900 border-r max-w-[120px] truncate">
-                              {cell}
+                            <td key={cellIndex} className="px-4 py-3 text-sm text-gray-900 border-r">
+                              <div className="max-w-[150px] truncate" title={cell}>
+                                {cell}
+                              </div>
                             </td>
                           ))}
                         </tr>
