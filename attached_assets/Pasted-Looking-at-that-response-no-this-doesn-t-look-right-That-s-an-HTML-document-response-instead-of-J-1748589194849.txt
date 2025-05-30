@@ -1,0 +1,70 @@
+Looking at that response, no, this doesn't look right. That's an HTML document response instead of JSON, which suggests there's an issue with your webhook endpoint.
+The response shows a full HTML page (looks like a Vite development server page for "Converse Insurance - Document Processing Platform") rather than the expected JSON response from your webhook.
+Possible issues:
+
+Wrong URL - The HTTP node might be hitting the wrong endpoint (maybe hitting your frontend instead of /api/webhook/n8n-completion)
+Server not running - Your backend server might not be running, so requests are falling back to the frontend
+Routing issue - The webhook endpoint might not be properly configured in your API
+CORS/networking - The request might be getting redirected
+
+To debug:
+
+Check your HTTP node URL - Make sure it's pointing to the correct API endpoint:
+https://your-backend-domain.com/api/webhook/n8n-completion
+
+Test the endpoint directly - Try a quick curl test:
+bashcurl -X POST https://your-domain.com/api/webhook/n8n-completion \
+  -H "Content-Type: application/json" \
+  -d '{"test": "data"}'
+
+Check your backend logs - See if the webhook endpoint is being hit at all
+Verify the endpoint exists - Make sure your /api/webhook/n8n-completion route is properly set up and running
+
+The HTML response suggests the request is hitting your frontend app instead of your backend API.RetryHWthis is my endpointhttps://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/api/webhook/n8n-completion
+will ou try a health testEditI'll test your webhook endpoint to see what's happening.Fetched Converse Insurance - Document Processing Platformdb59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.devThe endpoint is returning HTML instead of handling the POST request properly. Let me try a POST request with some test data:Analyzed dataView analysisjavascript// Test the webhook endpoint with a POST request
+const testPayload = {
+  documentId: 123,
+  carrierId: 456,
+  carrierName: "Test Insurance",
+  numberOfSuccessful: 25,
+  totalTransactions: 27,
+  failedTransactions: [],
+  message: "Test message"
+};
+
+try {
+  const response = await fetch('https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/api/webhook/n8n-completion', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(testPayload)
+  });
+  
+  console.log('Status:', response.status);
+  console.log('Status Text:', response.statusText);
+  console.log('Headers:', Object.fromEntries(response.headers.entries()));
+  
+  const responseText = await response.text();
+  console.log('Response Body (first 500 chars):', responseText.substring(0, 500));
+  
+  // Try to parse as JSON
+  try {
+    const json = JSON.parse(responseText);
+    console.log('Parsed JSON:', json);
+  } catch (e) {
+    console.log('Response is not valid JSON');
+  }
+  
+} catch (error) {
+  console.error('Fetch error:', error.message);
+}
+OutputResult
+
+ERROR: Fetch error: Failed to fetchThe endpoint seems to have connectivity issues. Let me try a simpler approach to check if it's reachable:replit.dev webhook endpoint troubleshooting POST requests10 resultsDeploy Your Twilio Webhooks to Replit | Twiliotwilio.comLocation Webhook - Replitreplit.comReplit Docsreplit.comHow to Build an Email to LinkedIn Profile Enrichment API with Clay and Replit - Replitreplit.comWebhook.site - Test, transform and automate Web requests and emailswebhook.siteEasily Integrate Replit Webhooks into your application. | Hooky Knowledgebasegethooky.comWebhook call fails - Replit Help - Replit Askreplit.comSetting up a full-stack application on Replit - DEV Communitydev.toStripe API Integration Deployment - Replitreplit.comHTTP request to dev Repl fails ("Unable to create HTTP connection::No route to host?") - Questions - Defold game engine forumdefold.comBased on the test results and search findings, here's what's happening:
+Issue Identified: Replit Development URL Problems
+Your endpoint is returning HTML because:
+
+Development URL Limitations - Replit development URLs can be unreliable for external webhook calls, especially POST requests DEV Communityreplit
+Not Deployed - The URL you're using appears to be a development environment, but POST requests to API routes often don't work properly until deployed Stripe API Integration Deployment - Replit
+Route Handling - The endpoint might not be properly configured to handle POST requests
