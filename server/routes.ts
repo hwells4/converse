@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDocumentSchema, updateDocumentSchema, insertCarrierSchema, webhookDocumentProcessedSchema, pdfParserWebhookSchema, n8nWebhookPayloadSchema } from "@shared/schema";
+import { insertDocumentSchema, updateDocumentSchema, insertCarrierSchema, webhookDocumentProcessedSchema, pdfParserWebhookSchema, n8nWebhookPayloadSchema, n8nCompletionWebhookSchema } from "@shared/schema";
 import { BackendAWSService } from "./aws-service";
 import { z } from "zod";
 
@@ -752,6 +752,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false,
         message: "Failed to process webhook",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // N8N completion webhook endpoint
+  app.post("/api/webhook/n8n-completion", async (req, res) => {
+    console.log('🔵 Received N8N completion webhook');
+    console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
+    
+    try {
+      // Validate webhook payload
+      const validatedPayload = n8nCompletionWebhookSchema.parse(req.body);
+      console.log('✅ N8N completion webhook payload validation passed');
+      
+      // Update document status to completed
+      const updatedDocument = await storage.updateDocument(validatedPayload.documentId, {
+        status: "completed",
+        metadata: {
+          completionData: {
+            carrierName: validatedPayload.carrierName,
+            numberOfSuccessful: validatedPayload.numberOfSuccessful,
+            totalTransactions: validatedPayload.totalTransactions,
+            failedTransactions: validatedPayload.failedTransactions || [],
+            message: validatedPayload.message,
+            completedAt: new Date().toISOString()
+          }
+        }
+      });
+
+      if (!updatedDocument) {
+        console.error('❌ Document not found for ID:', validatedPayload.documentId);
+        return res.status(404).json({ 
+          success: false, 
+          message: "Document not found" 
+        });
+      }
+
+      console.log(`✅ Document ${validatedPayload.documentId} marked as completed`);
+      console.log(`📊 Upload results: ${validatedPayload.numberOfSuccessful}/${validatedPayload.totalTransactions} successful`);
+      
+      if (validatedPayload.failedTransactions && validatedPayload.failedTransactions.length > 0) {
+        console.log(`⚠️ ${validatedPayload.failedTransactions.length} transactions failed`);
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Document status updated to completed",
+        document: updatedDocument
+      });
+    } catch (error) {
+      console.error('❌ Error processing N8N completion webhook:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to process completion webhook",
         error: error instanceof Error ? error.message : "Unknown error"
       });
     }

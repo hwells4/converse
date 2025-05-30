@@ -19,7 +19,7 @@ export const documents = pgTable("documents", {
   s3Key: text("s3_key").notNull(),
   s3Url: text("s3_url"),
   fileSize: integer("file_size").notNull(),
-  status: text("status").notNull().default("uploaded"), // 'uploaded', 'processing', 'processed', 'failed', 'review_pending', 'salesforce_upload_pending', 'completed'
+  status: text("status").notNull().default("uploaded"), // 'uploaded', 'processing', 'processed', 'failed', 'review_pending', 'salesforce_upload_pending', 'uploading', 'completed'
   textractJobId: text("textract_job_id"),
   csvS3Key: text("csv_s3_key"),
   csvUrl: text("csv_url"),
@@ -136,3 +136,22 @@ export const n8nWebhookPayloadSchema = z.object({
 });
 
 export type N8NWebhookPayload = z.infer<typeof n8nWebhookPayloadSchema>;
+
+// N8N completion webhook schema
+export const n8nCompletionWebhookSchema = z.object({
+  documentId: z.number(),
+  carrierId: z.number(),
+  carrierName: z.string(),
+  numberOfSuccessful: z.number(),
+  totalTransactions: z.number(),
+  failedTransactions: z.array(z.object({
+    policyNumber: z.string().optional(),
+    nameOfInsured: z.string().optional(),
+    commissionAmount: z.string().optional(),
+    error: z.string(),
+    rowIndex: z.number().optional(),
+  })).optional(),
+  message: z.string(),
+});
+
+export type N8NCompletionWebhook = z.infer<typeof n8nCompletionWebhookSchema>;

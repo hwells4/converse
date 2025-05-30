@@ -349,6 +349,13 @@ export function CSVUploadWizard({
 
   const handleConfirmationSubmit = async (statement: CommissionStatement) => {
     try {
+      // Update document status to "uploading"
+      if (documentId) {
+        await apiRequest("PATCH", `/api/documents/${documentId}`, {
+          status: "uploading"
+        });
+      }
+
       // First, upload the processed CSV data to S3
       const csvUploadResponse = await apiRequest("POST", "/api/s3/upload-processed-csv", {
         csvData: editableData,
