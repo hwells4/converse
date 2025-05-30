@@ -1,15 +1,8 @@
 import * as React from "react"
-import { Check, ChevronsUpDown } from "lucide-react"
+import { Check, ChevronsUpDown, Search } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command"
+import { Input } from "@/components/ui/input"
 import {
   Popover,
   PopoverContent,
@@ -40,8 +33,16 @@ export function SearchableSelect({
   disabled = false,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false)
+  const [search, setSearch] = React.useState("")
   
   const selectedOption = options.find((option) => option.value === value)
+  
+  const filteredOptions = React.useMemo(() => {
+    if (!search) return options
+    return options.filter((option) =>
+      option.label.toLowerCase().includes(search.toLowerCase())
+    )
+  }, [options, search])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -58,39 +59,47 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search..." />
-          <CommandList className="max-h-[300px] overflow-y-auto">
-            <CommandEmpty>No carriers found.</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.label}
-                  onSelect={() => {
-                    onValueChange(option.value === value ? "" : option.value)
-                    setOpen(false)
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === option.value ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  <span className={cn(
-                    option.required && "font-medium"
-                  )}>
-                    {option.label}
-                  </span>
-                  {option.required && (
-                    <span className="ml-auto text-xs text-red-500">*</span>
+        <div className="flex items-center border-b px-3">
+          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+          <Input
+            placeholder="Search carriers..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0"
+          />
+        </div>
+        <div className="max-h-[300px] overflow-y-auto p-1">
+          {filteredOptions.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              No carriers found.
+            </div>
+          ) : (
+            filteredOptions.map((option) => (
+              <div
+                key={option.value}
+                className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                onClick={() => {
+                  onValueChange(option.value === value ? "" : option.value)
+                  setSearch("")
+                  setOpen(false)
+                }}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    value === option.value ? "opacity-100" : "opacity-0"
                   )}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
+                />
+                <span className={cn(option.required && "font-medium")}>
+                  {option.label}
+                </span>
+                {option.required && (
+                  <span className="ml-auto text-xs text-red-500">*</span>
+                )}
+              </div>
+            ))
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   )
