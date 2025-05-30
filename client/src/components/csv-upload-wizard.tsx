@@ -54,7 +54,7 @@ export function CSVUploadWizard({
   onComplete 
 }: CSVUploadWizardProps) {
   const [currentStep, setCurrentStep] = useState<'preview' | 'mapping' | 'edit'>(parsedData ? 'preview' : 'preview');
-  const [selectedHeaderRow, setSelectedHeaderRow] = useState<number>(parsedData?.detectedHeaderRow || 0);
+  const [selectedHeaderRow, setSelectedHeaderRow] = useState<number>(-1); // Default to "headers are correct"
   const [headers, setHeaders] = useState<string[]>(parsedData?.headers || []);
   const [dataRows, setDataRows] = useState<string[][]>(parsedData?.rows || []);
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>({});
@@ -385,7 +385,7 @@ export function CSVUploadWizard({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="-1">Headers are already correct</SelectItem>
-                        {dataRows.slice(0, 5).map((row, index) => (
+                        {dataRows.slice(0, 20).map((row, index) => (
                           <SelectItem key={index} value={index.toString()}>
                             Row {index + 1}: {row.slice(0, 2).map(cell => cell.length > 15 ? cell.substring(0, 15) + '...' : cell).join(', ')}
                           </SelectItem>
