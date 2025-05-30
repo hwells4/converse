@@ -59,6 +59,10 @@ export function CSVUploadWizard({
   const [dataRows, setDataRows] = useState<string[][]>(parsedData?.rows || []);
   const [fieldMapping, setFieldMapping] = useState<FieldMapping>({});
   const [editableData, setEditableData] = useState<any[]>([]);
+  
+  // Cache key for localStorage
+  const cacheKey = `csv-wizard-${fileName}-${carrierId}`;
+  const cacheTimestampKey = `${cacheKey}-timestamp`;
 
   // Initialize data when parsedData changes
   useEffect(() => {
@@ -68,6 +72,67 @@ export function CSVUploadWizard({
       setSelectedHeaderRow(parsedData.detectedHeaderRow);
     }
   }, [parsedData]);
+
+  // Load cached data on component mount
+  useEffect(() => {
+    const loadCachedData = () => {
+      try {
+        const cachedTimestamp = localStorage.getItem(cacheTimestampKey);
+        if (cachedTimestamp) {
+          const cacheAge = Date.now() - parseInt(cachedTimestamp);
+          const fiveMinutes = 5 * 60 * 1000;
+          
+          if (cacheAge < fiveMinutes) {
+            const cachedData = localStorage.getItem(cacheKey);
+            if (cachedData) {
+              const parsed = JSON.parse(cachedData);
+              if (parsed.editableData && parsed.fieldMapping) {
+                setEditableData(parsed.editableData);
+                setFieldMapping(parsed.fieldMapping);
+                if (parsed.currentStep) {
+                  setCurrentStep(parsed.currentStep);
+                }
+              }
+            }
+          } else {
+            // Cache expired, clear it
+            localStorage.removeItem(cacheKey);
+            localStorage.removeItem(cacheTimestampKey);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading cached data:', error);
+      }
+    };
+
+    if (fileName && carrierId) {
+      loadCachedData();
+    }
+  }, [fileName, carrierId, cacheKey, cacheTimestampKey]);
+
+  // Save data to cache whenever it changes
+  useEffect(() => {
+    if (editableData.length > 0 || Object.keys(fieldMapping).length > 0) {
+      try {
+        const dataToCache = {
+          editableData,
+          fieldMapping,
+          currentStep,
+          timestamp: Date.now()
+        };
+        localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
+        localStorage.setItem(cacheTimestampKey, Date.now().toString());
+      } catch (error) {
+        console.error('Error saving to cache:', error);
+      }
+    }
+  }, [editableData, fieldMapping, currentStep, cacheKey, cacheTimestampKey]);
+
+  // Clear cache on component unmount or completion
+  const clearCache = () => {
+    localStorage.removeItem(cacheKey);
+    localStorage.removeItem(cacheTimestampKey);
+  };
 
   // Auto-suggest mappings based on header names
   const getSuggestedMapping = (header: string): string | null => {
@@ -182,12 +247,22 @@ export function CSVUploadWizard({
   };
 
   const handleComplete = () => {
+    clearCache(); // Clear cache on successful completion
     onComplete({
       mapping: fieldMapping,
       data: editableData,
       fileName,
       carrierId
     });
+  };
+
+  // Handle modal close with cache cleanup option
+  const handleClose = () => {
+    // Only clear cache if user hasn't made significant progress
+    if (currentStep === 'preview' || Object.keys(fieldMapping).length === 0) {
+      clearCache();
+    }
+    onClose();
   };
 
   const getMappedFieldsCount = () => {
@@ -204,7 +279,7 @@ export function CSVUploadWizard({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>{getStepTitle()}</DialogTitle>
@@ -222,9 +297,17 @@ export function CSVUploadWizard({
                 <p className="text-gray-600 text-sm">{fileName}</p>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center space-x-3">
+              {(currentStep === 'mapping' || currentStep === 'edit') && Object.keys(fieldMapping).length > 0 && (
+                <div className="flex items-center space-x-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                  <Check className="h-3 w-3" />
+                  <span>Progress saved</span>
+                </div>
+              )}
+              <Button variant="ghost" size="sm" onClick={handleClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {/* Progress Steps */}
@@ -344,54 +427,114 @@ export function CSVUploadWizard({
 
           {currentStep === 'mapping' && (
             <div className="p-8 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span className="flex items-center space-x-2">
-                      <Table className="h-5 w-5" />
-                      <span>Column Mapping</span>
-                    </span>
-                    <Badge variant="outline">
-                      {getMappedFieldsCount()} of {headers.length} mapped
-                    </Badge>
+              {/* Quick mapping suggestions */}
+              <Card className="bg-green-50 border-green-200">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-green-800 flex items-center space-x-2">
+                    <Check className="h-5 w-5" />
+                    <span>Smart Mapping Suggestions</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                      <h3 className="font-medium text-gray-900">Spreadsheet Columns</h3>
-                      <ScrollArea className="h-96">
-                        <div className="space-y-4">
-                          {headers.map((header, index) => (
-                            <div key={index} className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium text-gray-700">
-                                  {header || `Column ${index + 1}`}
-                                </span>
-                                {fieldMapping[index] && fieldMapping[index] !== 'skip' && (
-                                  <Check className="h-4 w-4 text-green-600" />
-                                )}
-                              </div>
-                              
-                              <Select 
-                                value={fieldMapping[index] || "none"} 
-                                onValueChange={(value) => handleMappingChange(index, value)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select field..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">No mapping</SelectItem>
-                                  {SALESFORCE_FIELDS.map((field) => (
-                                    <SelectItem key={field.value} value={field.value}>
-                                      {field.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                  <p className="text-green-700 text-sm mb-3">
+                    We've automatically suggested mappings based on your column names. Review and adjust as needed.
+                  </p>
+                  <div className="flex items-center space-x-4">
+                    <Badge variant="outline" className="bg-white text-green-700 border-green-300">
+                      {getMappedFieldsCount()} of {headers.length} fields mapped
+                    </Badge>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => {
+                        const autoMapping: FieldMapping = {};
+                        headers.forEach((header, index) => {
+                          const suggestion = getSuggestedMapping(header);
+                          if (suggestion) {
+                            autoMapping[index] = suggestion;
+                          }
+                        });
+                        setFieldMapping(autoMapping);
+                      }}
+                      className="text-green-700 border-green-300 hover:bg-green-100"
+                    >
+                      Re-run Auto Mapping
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
-                              <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                                Sample: {dataRows[selectedHeaderRow + 1]?.[index] || 'No data'}
+              {/* Main mapping interface */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Table className="h-5 w-5" />
+                    <span>Column Mapping</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {/* Table-style mapping view */}
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-6 py-3 border-b">
+                        <div className="grid grid-cols-4 gap-4 text-sm font-medium text-gray-700">
+                          <div>Your Column</div>
+                          <div>Sample Data</div>
+                          <div>Maps To</div>
+                          <div>Status</div>
+                        </div>
+                      </div>
+                      <ScrollArea className="h-96">
+                        <div className="space-y-0">
+                          {headers.map((header, index) => (
+                            <div key={index} className="px-6 py-4 border-b border-gray-100 hover:bg-gray-50">
+                              <div className="grid grid-cols-4 gap-4 items-center">
+                                {/* Column name */}
+                                <div className="font-medium text-gray-900">
+                                  {header || `Column ${index + 1}`}
+                                </div>
+                                
+                                {/* Sample data */}
+                                <div className="text-sm text-gray-600 font-mono bg-gray-100 px-2 py-1 rounded text-center">
+                                  {dataRows[selectedHeaderRow + 1]?.[index] || 'No data'}
+                                </div>
+                                
+                                {/* Mapping dropdown */}
+                                <div>
+                                  <Select 
+                                    value={fieldMapping[index] || "none"} 
+                                    onValueChange={(value) => handleMappingChange(index, value)}
+                                  >
+                                    <SelectTrigger className="w-full">
+                                      <SelectValue placeholder="Select field..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">
+                                        <span className="text-gray-500">Skip this column</span>
+                                      </SelectItem>
+                                      {SALESFORCE_FIELDS.map((field) => (
+                                        <SelectItem key={field.value} value={field.value}>
+                                          {field.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                
+                                {/* Status indicator */}
+                                <div className="flex items-center">
+                                  {fieldMapping[index] && fieldMapping[index] !== 'none' ? (
+                                    <div className="flex items-center space-x-2 text-green-600">
+                                      <Check className="h-4 w-4" />
+                                      <span className="text-sm">Mapped</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center space-x-2 text-gray-400">
+                                      <span className="w-4 h-4 border-2 border-gray-300 rounded-full"></span>
+                                      <span className="text-sm">Unmapped</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -399,30 +542,28 @@ export function CSVUploadWizard({
                       </ScrollArea>
                     </div>
 
-                    <div className="space-y-4">
-                      <h3 className="font-medium text-gray-900">Field Mapping Preview</h3>
-                      <ScrollArea className="h-96">
-                        <div className="space-y-3">
-                          {Object.entries(fieldMapping).filter(([_, field]) => field !== 'skip' && field !== '').map(([headerIndex, salesforceField]) => {
-                            const header = headers[parseInt(headerIndex)];
-                            const fieldLabel = SALESFORCE_FIELDS.find(f => f.value === salesforceField)?.label;
-                            
-                            return (
-                              <div key={headerIndex} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                                <div className="flex items-center space-x-2 text-sm">
-                                  <span className="font-medium text-gray-900">{header}</span>
+                    {/* Mapping summary */}
+                    {getMappedFieldsCount() > 0 && (
+                      <Card className="bg-blue-50 border-blue-200">
+                        <CardContent className="pt-4">
+                          <h4 className="font-medium text-blue-900 mb-3">Mapping Summary</h4>
+                          <div className="grid grid-cols-2 gap-4">
+                            {Object.entries(fieldMapping).filter(([_, field]) => field !== 'none').map(([headerIndex, salesforceField]) => {
+                              const header = headers[parseInt(headerIndex)];
+                              const fieldLabel = SALESFORCE_FIELDS.find(f => f.value === salesforceField)?.label;
+                              
+                              return (
+                                <div key={headerIndex} className="flex items-center space-x-2 text-sm bg-white p-2 rounded border">
+                                  <span className="font-medium text-gray-700">{header}</span>
                                   <ArrowRight className="h-3 w-3 text-gray-400" />
                                   <span className="text-blue-700">{fieldLabel}</span>
                                 </div>
-                                <div className="text-xs text-gray-500 mt-1">
-                                  Sample: {dataRows[selectedHeaderRow + 1]?.[parseInt(headerIndex)] || 'No data'}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </ScrollArea>
-                    </div>
+                              );
+                            })}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -518,7 +659,7 @@ export function CSVUploadWizard({
                 </Button>
               )}
               
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
               
