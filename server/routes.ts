@@ -866,6 +866,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Upload processed CSV to S3 for N8N consumption
+  app.post("/api/s3/upload-processed-csv", async (req, res) => {
+    try {
+      const { csvData, fileName, carrierId, documentId } = req.body;
+      
+      if (!csvData || !fileName || !carrierId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "csvData, fileName, and carrierId are required" 
+        });
+      }
+
+      if (!BackendAWSService.isConfigured()) {
+        return res.status(500).json({ 
+          success: false, 
+          message: "AWS credentials not configured" 
+        });
+      }
+
+      // Generate S3 key for processed CSV
+      const timestamp = Date.now();
+      const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const s3Key = `processed-csv/${new Date().toISOString().split('T')[0]}_carrier-${carrierId}_${sanitizedFileName}_${timestamp}.csv`;
+
+      // Convert array data back to CSV format
+      const csvContent = csvData.map((row: any) => 
+        Object.values(row).map((value: any) => 
+          typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+        ).join(',')
+      ).join('\n');
+
+      // Upload to S3
+      const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
+      const s3Client = new S3Client({
+        region: process.env.AWS_REGION || 'us-east-1',
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+        },
+      });
+
+      const uploadCommand = new PutObjectCommand({
+        Bucket: process.env.AWS_S3_BUCKET_NAME!,
+        Key: s3Key,
+        Body: csvContent,
+        ContentType: 'text/csv',
+      });
+
+      await s3Client.send(uploadCommand);
+
+      const s3Url = `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${s3Key}`;
+
+      console.log(`✅ Processed CSV uploaded to S3: ${s3Key}`);
+
+      res.json({
+        success: true,
+        message: "CSV uploaded to S3 successfully",
+        csvS3Key: s3Key,
+        csvUrl: s3Url
+      });
+
+    } catch (error) {
+      console.error('💥 CSV S3 upload error:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to upload CSV to S3",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // N8N webhook endpoint for Salesforce upload
   app.post("/api/n8n/salesforce-upload", async (req, res) => {
     console.log('🔵 N8N Salesforce upload webhook called');

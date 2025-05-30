@@ -267,10 +267,36 @@ export function CSVUploadWizard({
 
   const handleConfirmationSubmit = async (statement: CommissionStatement) => {
     try {
-      // Prepare the N8N webhook payload
+      // First, upload the processed CSV data to S3
+      const csvUploadResponse = await apiRequest("POST", "/api/s3/upload-processed-csv", {
+        csvData: editableData,
+        fileName,
+        carrierId,
+        documentId: documentId || 0
+      });
+
+      const csvUploadResult = await csvUploadResponse.json();
+      
+      if (!csvUploadResult.success) {
+        throw new Error(csvUploadResult.message || "Failed to upload CSV to S3");
+      }
+
+      // Extract mapped field headers for N8N reference
+      const mappedHeaders = Object.entries(fieldMapping)
+        .filter(([_, salesforceField]) => salesforceField !== 'skip')
+        .map(([headerIndex, salesforceField]) => {
+          const fieldLabel = SALESFORCE_FIELDS.find(f => f.value === salesforceField)?.label;
+          return fieldLabel || salesforceField;
+        });
+
+      // Prepare the N8N webhook payload with S3 reference
       const payload: N8NWebhookPayload = {
         statement,
-        transactions: editableData,
+        transactions: {
+          csvS3Key: csvUploadResult.csvS3Key,
+          csvUrl: csvUploadResult.csvUrl,
+          headers: mappedHeaders
+        },
         transactionCount: editableData.length,
         documentId: documentId || 0,
         fileName
