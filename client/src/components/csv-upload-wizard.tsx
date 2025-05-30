@@ -307,10 +307,17 @@ export function CSVUploadWizard({
             </div>
           </div>
 
-          {/* Progress Steps */}
+          {/* Progress Steps - Clickable */}
           <div className="flex items-center space-x-4 mt-6">
-            <div className={`flex items-center space-x-2 ${currentStep === 'preview' ? 'text-blue-600' : (currentStep === 'mapping' || currentStep === 'edit') ? 'text-green-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            <button 
+              onClick={() => setCurrentStep('preview')}
+              className={`flex items-center space-x-2 transition-colors hover:opacity-80 ${
+                currentStep === 'preview' ? 'text-blue-600' : 
+                (currentStep === 'mapping' || currentStep === 'edit') ? 'text-green-600' : 
+                'text-gray-400'
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
                 currentStep === 'preview' ? 'bg-blue-100 border-2 border-blue-600' : 
                 (currentStep === 'mapping' || currentStep === 'edit') ? 'bg-green-100 border-2 border-green-600' : 
                 'bg-gray-100 border-2 border-gray-300'
@@ -318,10 +325,17 @@ export function CSVUploadWizard({
                 {(currentStep === 'mapping' || currentStep === 'edit') ? <Check className="h-4 w-4" /> : <span className="text-sm font-medium">1</span>}
               </div>
               <span className="font-medium">Preview</span>
-            </div>
+            </button>
             <ArrowRight className="h-4 w-4 text-gray-400" />
-            <div className={`flex items-center space-x-2 ${currentStep === 'mapping' ? 'text-blue-600' : currentStep === 'edit' ? 'text-green-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            <button 
+              onClick={() => setCurrentStep('mapping')}
+              className={`flex items-center space-x-2 transition-colors hover:opacity-80 ${
+                currentStep === 'mapping' ? 'text-blue-600' : 
+                currentStep === 'edit' ? 'text-green-600' : 
+                'text-gray-400'
+              }`}
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
                 currentStep === 'mapping' ? 'bg-blue-100 border-2 border-blue-600' : 
                 currentStep === 'edit' ? 'bg-green-100 border-2 border-green-600' : 
                 'bg-gray-100 border-2 border-gray-300'
@@ -329,96 +343,98 @@ export function CSVUploadWizard({
                 {currentStep === 'edit' ? <Check className="h-4 w-4" /> : <span className="text-sm font-medium">2</span>}
               </div>
               <span className="font-medium">Mapping</span>
-            </div>
+            </button>
             <ArrowRight className="h-4 w-4 text-gray-400" />
-            <div className={`flex items-center space-x-2 ${currentStep === 'edit' ? 'text-blue-600' : 'text-gray-400'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            <button 
+              onClick={() => currentStep !== 'preview' && setCurrentStep('edit')}
+              disabled={currentStep === 'preview'}
+              className={`flex items-center space-x-2 transition-colors ${
+                currentStep === 'preview' ? 'cursor-not-allowed opacity-50' : 'hover:opacity-80'
+              } ${currentStep === 'edit' ? 'text-blue-600' : 'text-gray-400'}`}
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
                 currentStep === 'edit' ? 'bg-blue-100 border-2 border-blue-600' : 'bg-gray-100 border-2 border-gray-300'
               }`}>
                 <span className="text-sm font-medium">3</span>
               </div>
               <span className="font-medium">Edit & Review</span>
-            </div>
+            </button>
           </div>
         </div>
 
         {/* Step Content */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden flex flex-col">
           {currentStep === 'preview' && (
-            <div className="p-6 space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Eye className="h-5 w-5" />
-                    <span>Data Preview</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-blue-900">Header Row Selection</h4>
-                        <Badge variant="outline" className="text-blue-700">Optional</Badge>
-                      </div>
-                      <p className="text-sm text-blue-700 mb-4">
-                        If your CSV already has proper headers in the first row, you can skip this step and proceed directly to mapping.
-                      </p>
-                      <div className="flex items-center space-x-4">
-                        <label className="text-sm font-medium text-blue-900">Header Row:</label>
-                        <Select value={selectedHeaderRow.toString()} onValueChange={(value) => handleHeaderRowChange(parseInt(value))}>
-                          <SelectTrigger className="w-64">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {dataRows.slice(0, 5).map((row, index) => (
-                              <SelectItem key={index} value={index.toString()}>
-                                Row {index + 1}: {row.slice(0, 3).join(', ')}...
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button 
-                          variant="outline" 
-                          onClick={() => setCurrentStep('mapping')}
-                          className="text-blue-600 border-blue-300 hover:bg-blue-50"
-                        >
-                          Skip to Mapping
-                        </Button>
-                      </div>
-                    </div>
+            <div className="p-4 flex-1 flex flex-col space-y-3">
+              {/* Header Selection - Compressed */}
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-medium text-blue-900 text-sm">Header Row Selection</h4>
+                  <Badge variant="outline" className="text-blue-700 text-xs">Optional</Badge>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <label className="text-xs font-medium text-blue-900">Header Row:</label>
+                  <Select value={selectedHeaderRow.toString()} onValueChange={(value) => handleHeaderRowChange(parseInt(value))}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dataRows.slice(0, 5).map((row, index) => (
+                        <SelectItem key={index} value={index.toString()}>
+                          Row {index + 1}: {row.slice(0, 3).join(', ')}...
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button 
+                    size="sm"
+                    variant="outline" 
+                    onClick={() => setCurrentStep('mapping')}
+                    className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                  >
+                    Skip to Mapping
+                  </Button>
+                </div>
+              </div>
 
-                    <div className="border rounded-lg overflow-hidden">
-                      <ScrollArea className="h-[500px]">
-                        <table className="w-full">
-                          <thead className="bg-gray-50 sticky top-0">
-                            <tr>
-                              {headers.map((header, index) => (
-                                <th key={index} className="px-4 py-3 text-left text-sm font-medium text-gray-900 border-r">
-                                  {header || `Column ${index + 1}`}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {dataRows.slice(selectedHeaderRow + 1, selectedHeaderRow + 11).map((row, rowIndex) => (
-                              <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                {row.map((cell, cellIndex) => (
-                                  <td key={cellIndex} className="px-4 py-3 text-sm text-gray-900 border-r">
-                                    {cell}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </ScrollArea>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Showing first 10 data rows. Total rows: {dataRows.length - selectedHeaderRow - 1}
-                    </p>
+              {/* Data Preview - Compressed */}
+              <div className="flex-1 border rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-3 py-2 border-b">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-gray-900 text-sm flex items-center">
+                      <Eye className="h-4 w-4 mr-2" />
+                      Data Preview
+                    </h3>
+                    <span className="text-xs text-gray-600">
+                      Showing first 8 rows • Total: {dataRows.length - selectedHeaderRow - 1} rows
+                    </span>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+                <ScrollArea className="h-[300px]">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        {headers.map((header, index) => (
+                          <th key={index} className="px-3 py-2 text-left text-xs font-medium text-gray-900 border-r">
+                            {header || `Column ${index + 1}`}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dataRows.slice(selectedHeaderRow + 1, selectedHeaderRow + 9).map((row, rowIndex) => (
+                        <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          {row.map((cell, cellIndex) => (
+                            <td key={cellIndex} className="px-3 py-2 text-xs text-gray-900 border-r max-w-[120px] truncate">
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </ScrollArea>
+              </div>
             </div>
           )}
 
