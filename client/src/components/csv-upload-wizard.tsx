@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -131,10 +131,15 @@ export function CSVUploadWizard({
   };
 
   const handleMappingChange = (headerIndex: number, salesforceField: string) => {
-    setFieldMapping(prev => ({
-      ...prev,
-      [headerIndex]: salesforceField
-    }));
+    setFieldMapping(prev => {
+      const updated = { ...prev };
+      if (salesforceField === 'none') {
+        delete updated[headerIndex];
+      } else {
+        updated[headerIndex] = salesforceField;
+      }
+      return updated;
+    });
   };
 
   const handleCellEdit = (rowIndex: number, fieldName: string, newValue: string) => {
@@ -201,6 +206,10 @@ export function CSVUploadWizard({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden p-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{getStepTitle()}</DialogTitle>
+          <DialogDescription>CSV Upload Wizard</DialogDescription>
+        </DialogHeader>
         {/* Full-screen header */}
         <div className="bg-white border-b border-gray-200 px-8 py-6">
           <div className="flex items-center justify-between">
@@ -266,20 +275,36 @@ export function CSVUploadWizard({
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="flex items-center space-x-4">
-                      <label className="text-sm font-medium">Header Row:</label>
-                      <Select value={selectedHeaderRow.toString()} onValueChange={(value) => handleHeaderRowChange(parseInt(value))}>
-                        <SelectTrigger className="w-48">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {dataRows.slice(0, 5).map((row, index) => (
-                            <SelectItem key={index} value={index.toString()}>
-                              Row {index + 1}: {row.slice(0, 3).join(', ')}...
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-medium text-blue-900">Header Row Selection</h4>
+                        <Badge variant="outline" className="text-blue-700">Optional</Badge>
+                      </div>
+                      <p className="text-sm text-blue-700 mb-4">
+                        If your CSV already has proper headers in the first row, you can skip this step and proceed directly to mapping.
+                      </p>
+                      <div className="flex items-center space-x-4">
+                        <label className="text-sm font-medium text-blue-900">Header Row:</label>
+                        <Select value={selectedHeaderRow.toString()} onValueChange={(value) => handleHeaderRowChange(parseInt(value))}>
+                          <SelectTrigger className="w-64">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {dataRows.slice(0, 5).map((row, index) => (
+                              <SelectItem key={index} value={index.toString()}>
+                                Row {index + 1}: {row.slice(0, 3).join(', ')}...
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setCurrentStep('mapping')}
+                          className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                        >
+                          Skip to Mapping
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="border rounded-lg overflow-hidden">
@@ -349,14 +374,14 @@ export function CSVUploadWizard({
                               </div>
                               
                               <Select 
-                                value={fieldMapping[index] || ""} 
+                                value={fieldMapping[index] || "none"} 
                                 onValueChange={(value) => handleMappingChange(index, value)}
                               >
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select field..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="">No mapping</SelectItem>
+                                  <SelectItem value="none">No mapping</SelectItem>
                                   {SALESFORCE_FIELDS.map((field) => (
                                     <SelectItem key={field.value} value={field.value}>
                                       {field.label}
