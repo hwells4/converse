@@ -348,7 +348,7 @@ export function CSVUploadWizard({
         {/* Step Content */}
         <div className="flex-1 overflow-hidden">
           {currentStep === 'preview' && (
-            <div className="p-8 space-y-6">
+            <div className="p-6 space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
@@ -391,7 +391,7 @@ export function CSVUploadWizard({
                     </div>
 
                     <div className="border rounded-lg overflow-hidden">
-                      <ScrollArea className="h-96">
+                      <ScrollArea className="h-[500px]">
                         <table className="w-full">
                           <thead className="bg-gray-50 sticky top-0">
                             <tr>
@@ -477,7 +477,7 @@ export function CSVUploadWizard({
                           <div>Status</div>
                         </div>
                       </div>
-                      <ScrollArea className="h-96">
+                      <ScrollArea className="h-[500px]">
                         <div className="space-y-0">
                           {headers.map((header, index) => (
                             <div key={index} className="px-6 py-4 border-b border-gray-100 hover:bg-gray-50">
@@ -543,7 +543,7 @@ export function CSVUploadWizard({
           )}
 
           {currentStep === 'edit' && (
-            <div className="p-8 space-y-6">
+            <div className="p-6 space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
@@ -559,7 +559,7 @@ export function CSVUploadWizard({
                 </CardHeader>
                 <CardContent>
                   <div className="border rounded-lg overflow-hidden">
-                    <ScrollArea className="h-96">
+                    <ScrollArea className="h-[500px]">
                       <table className="w-full">
                         <thead className="bg-gray-50 sticky top-0">
                           <tr>
