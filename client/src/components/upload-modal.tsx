@@ -40,6 +40,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
   const [fileType, setFileType] = useState<'pdf' | 'csv' | 'xlsx' | null>(null);
   const [showFieldMapping, setShowFieldMapping] = useState(false);
   const [showSpreadsheetPreview, setShowSpreadsheetPreview] = useState(false);
+  const [uploadedDocumentId, setUploadedDocumentId] = useState<number | null>(null);
   const { uploadState, uploadFile, resetUpload } = useUpload();
   const { data: documents } = useDocuments();
   const { data: carriers, isLoading: carriersLoading } = useCarriers();
@@ -222,32 +223,31 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     if (selectedFile && documentType && selectedCarrierId) {
       const finalFileName = generateFileName(selectedFile.name, customFileName);
       
-      // For CSV/XLSX files, we'll need to handle differently
-      if (fileType === 'csv' || fileType === 'xlsx') {
-        // Skip AWS upload for CSV/XLSX and go directly to the unified wizard
-        await handleSpreadsheetUpload();
-      } else {
-        // PDF files go through the normal AWS flow
-        await uploadFile(selectedFile, documentType, parseInt(selectedCarrierId), finalFileName);
+      // All files (PDF, CSV, XLSX) now go through S3 upload
+      const uploadResult = await uploadFile(selectedFile, documentType, parseInt(selectedCarrierId), finalFileName);
+      
+      // For CSV/XLSX files, if upload was successful, close modal and open field mapping
+      if ((fileType === 'csv' || fileType === 'xlsx') && uploadResult) {
+        // Parse the file for field mapping
+        try {
+          const parsed = await parseSpreadsheetFile(selectedFile);
+          setParsedData(parsed);
+          setSelectedHeaderRow(parsed.detectedHeaderRow);
+          setUploadedDocumentId(uploadResult.id);
+          
+          // Close the upload modal first
+          handleClose();
+          
+          // Then open field mapping with the uploaded document
+          setShowFieldMapping(true);
+        } catch (error) {
+          toast({
+            title: "File Parse Error",
+            description: "Unable to parse the spreadsheet file. Please check the file format.",
+            variant: "destructive",
+          });
+        }
       }
-    }
-  };
-
-  const handleSpreadsheetUpload = async () => {
-    if (!selectedFile || (fileType !== 'csv' && fileType !== 'xlsx')) return;
-    
-    try {
-      // Parse the spreadsheet file and go directly to the unified wizard
-      const parsed = await parseSpreadsheetFile(selectedFile);
-      setParsedData(parsed);
-      setSelectedHeaderRow(parsed.detectedHeaderRow);
-      setShowFieldMapping(true); // Show the unified wizard
-    } catch (error) {
-      toast({
-        title: "File Parse Error",
-        description: "Unable to parse the spreadsheet file. Please check the file format.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -289,6 +289,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     setFileType(null);
     setShowFieldMapping(false);
     setShowSpreadsheetPreview(false);
+    setUploadedDocumentId(null);
     resetUpload();
     onClose();
   };
@@ -678,13 +679,13 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
       </AlertDialog>
 
       {/* CSV Upload Wizard */}
-      {parsedData && (
+      {parsedData && uploadedDocumentId && (
         <CSVUploadWizard
           isOpen={showFieldMapping}
           onClose={() => setShowFieldMapping(false)}
           parsedData={parsedData}
           fileName={generateFileName(selectedFile?.name || '', customFileName)}
-          carrierId={parseInt(selectedCarrierId)}
+          carrierId={uploadedDocumentId ? parseInt(selectedCarrierId) : 0}
           onComplete={handleFieldMappingComplete}
         />
       )}
