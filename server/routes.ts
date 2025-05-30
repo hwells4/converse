@@ -235,11 +235,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (document.csvS3Key) {
         console.log(`☁️ Downloading processed CSV from S3 key: ${document.csvS3Key}`);
         csvContent = await BackendAWSService.downloadFromS3(document.csvS3Key);
-      } else if (document.s3Key && (document.s3Key.endsWith('.csv') || document.filename.endsWith('.csv'))) {
+      } else if (document.s3Key && (document.originalName?.endsWith('.csv') || document.filename.includes('.csv'))) {
         console.log(`☁️ Downloading direct CSV upload from S3 key: ${document.s3Key}`);
         csvContent = await BackendAWSService.downloadFromS3(document.s3Key);
       } else {
         console.log(`❌ Document ${id} has no CSV data available`);
+        console.log(`📋 Document details: originalName=${document.originalName}, filename=${document.filename}, s3Key=${document.s3Key}`);
         return res.status(404).json({ message: "CSV data not available for this document" });
       }
 
