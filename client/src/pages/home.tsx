@@ -2,12 +2,24 @@ import { useState } from "react";
 import { UploadModal } from "@/components/upload-modal";
 import { RecentDocuments } from "@/components/recent-documents";
 import { ToastNotifications } from "@/components/toast-notifications";
+import { CSVUploadWizard } from "@/components/csv-upload-wizard";
 import { Button } from "@/components/ui/button";
 import { FileText, DollarSign, Shield, User } from "lucide-react";
 
 export default function Home() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedDocumentType, setSelectedDocumentType] = useState<"commission" | "renewal" | null>(null);
+  const [csvWizardData, setCsvWizardData] = useState<{
+    isOpen: boolean;
+    parsedData: any;
+    fileName: string;
+    carrierId: number;
+  }>({
+    isOpen: false,
+    parsedData: null,
+    fileName: "",
+    carrierId: 0,
+  });
 
   const handleUploadClick = (documentType: "commission" | "renewal") => {
     setSelectedDocumentType(documentType);
@@ -17,6 +29,29 @@ export default function Home() {
   const handleCloseModal = () => {
     setIsUploadModalOpen(false);
     setSelectedDocumentType(null);
+  };
+
+  const handleOpenCSVWizard = (parsedData: any, fileName: string, carrierId: number) => {
+    setCsvWizardData({
+      isOpen: true,
+      parsedData,
+      fileName,
+      carrierId,
+    });
+  };
+
+  const handleCloseCSVWizard = () => {
+    setCsvWizardData({
+      isOpen: false,
+      parsedData: null,
+      fileName: "",
+      carrierId: 0,
+    });
+  };
+
+  const handleCSVWizardComplete = (finalData: any) => {
+    console.log("CSV wizard complete, ready for Salesforce:", finalData);
+    handleCloseCSVWizard();
   };
 
   return (
@@ -105,7 +140,20 @@ export default function Home() {
           isOpen={isUploadModalOpen}
           onClose={handleCloseModal}
           documentType={selectedDocumentType}
+          onOpenCSVWizard={handleOpenCSVWizard}
         />
+
+        {/* CSV Upload Wizard */}
+        {csvWizardData.isOpen && csvWizardData.parsedData && (
+          <CSVUploadWizard
+            isOpen={csvWizardData.isOpen}
+            onClose={handleCloseCSVWizard}
+            parsedData={csvWizardData.parsedData}
+            fileName={csvWizardData.fileName}
+            carrierId={csvWizardData.carrierId}
+            onComplete={handleCSVWizardComplete}
+          />
+        )}
 
         {/* Toast Notifications */}
         <ToastNotifications />

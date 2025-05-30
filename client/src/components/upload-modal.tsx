@@ -21,6 +21,7 @@ interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   documentType: "commission" | "renewal" | null;
+  onOpenCSVWizard?: (parsedData: any, fileName: string, carrierId: number) => void;
 }
 
 interface ParsedSpreadsheetData {
@@ -29,7 +30,7 @@ interface ParsedSpreadsheetData {
   detectedHeaderRow: number;
 }
 
-export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps) {
+export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: UploadModalProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [customFileName, setCustomFileName] = useState("");
   const [selectedCarrierId, setSelectedCarrierId] = useState<string>("");
@@ -226,20 +227,17 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
       // All files (PDF, CSV, XLSX) now go through S3 upload
       const uploadResult = await uploadFile(selectedFile, documentType, parseInt(selectedCarrierId), finalFileName);
       
-      // For CSV/XLSX files, if upload was successful, close modal and open field mapping
-      if ((fileType === 'csv' || fileType === 'xlsx') && uploadResult) {
+      // For CSV/XLSX files, if upload was successful, open field mapping immediately
+      if ((fileType === 'csv' || fileType === 'xlsx') && uploadResult && onOpenCSVWizard) {
         // Parse the file for field mapping
         try {
           const parsed = await parseSpreadsheetFile(selectedFile);
-          setParsedData(parsed);
-          setSelectedHeaderRow(parsed.detectedHeaderRow);
-          setUploadedDocumentId(uploadResult.id);
           
           // Close the upload modal first
           handleClose();
           
-          // Then open field mapping with the uploaded document
-          setShowFieldMapping(true);
+          // Open CSV wizard through callback
+          onOpenCSVWizard(parsed, finalFileName, parseInt(selectedCarrierId));
         } catch (error) {
           toast({
             title: "File Parse Error",
@@ -678,17 +676,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* CSV Upload Wizard */}
-      {parsedData && uploadedDocumentId && (
-        <CSVUploadWizard
-          isOpen={showFieldMapping}
-          onClose={() => setShowFieldMapping(false)}
-          parsedData={parsedData}
-          fileName={generateFileName(selectedFile?.name || '', customFileName)}
-          carrierId={uploadedDocumentId ? parseInt(selectedCarrierId) : 0}
-          onComplete={handleFieldMappingComplete}
-        />
-      )}
+
     </Dialog>
   );
 }
