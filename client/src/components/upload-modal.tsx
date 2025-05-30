@@ -250,18 +250,26 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
   const handleSpreadsheetUpload = async () => {
     if (!parsedData || selectedHeaderRow === null) return;
     
-    // Create document record with spreadsheet data
-    const finalFileName = generateFileName(selectedFile!.name, customFileName);
-    // TODO: We'll need to modify the backend to handle spreadsheet data directly
-    // For now, we'll store the parsed data in a way that can be processed
-    console.log("Spreadsheet data ready for field mapping:", {
-      headers: parsedData.headers,
-      rows: parsedData.rows,
-      fileName: finalFileName,
+    // Show field mapping modal
+    setShowFieldMapping(true);
+  };
+
+  const handleFieldMappingComplete = async (fieldMapping: any) => {
+    // TODO: Send data to Salesforce via N8N webhook
+    console.log("Field mapping complete, ready for Salesforce:", {
+      headers: parsedData!.headers,
+      rows: parsedData!.rows,
+      fieldMapping,
+      fileName: generateFileName(selectedFile!.name, customFileName),
       carrierId: selectedCarrierId
     });
     
-    // Close modal and proceed to field mapping
+    toast({
+      title: "Success",
+      description: "Data processed and ready for Salesforce upload!",
+    });
+    
+    setShowFieldMapping(false);
     handleClose();
   };
 
@@ -288,6 +296,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     setParsedData(null);
     setSelectedHeaderRow(null);
     setFileType(null);
+    setShowFieldMapping(false);
     resetUpload();
     onClose();
   };
@@ -626,6 +635,19 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Spreadsheet Field Mapping Modal */}
+      {parsedData && (
+        <SpreadsheetFieldMapping
+          isOpen={showFieldMapping}
+          onClose={() => setShowFieldMapping(false)}
+          headers={parsedData.headers}
+          sampleData={parsedData.rows.slice(0, 3)} // First 3 rows as sample
+          fileName={generateFileName(selectedFile?.name || '', customFileName)}
+          carrierId={parseInt(selectedCarrierId)}
+          onProceedToSalesforce={handleFieldMappingComplete}
+        />
+      )}
     </Dialog>
   );
 }
