@@ -1018,6 +1018,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const n8nResult = await n8nResponse.text();
         console.log('✅ N8N webhook response:', n8nResult);
+        console.log('✅ N8N response status:', n8nResponse.status);
+        console.log('✅ N8N response headers:', Object.fromEntries(n8nResponse.headers.entries()));
       }
 
       res.json({

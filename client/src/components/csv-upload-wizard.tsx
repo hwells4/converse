@@ -304,8 +304,9 @@ export function CSVUploadWizard({
 
       // Send to N8N webhook
       const n8nResponse = await apiRequest("POST", "/api/n8n/salesforce-upload", payload);
+      const n8nResult = await n8nResponse.json();
       
-      console.log("N8N webhook response:", n8nResponse);
+      console.log("N8N webhook response:", n8nResult);
 
       toast({
         title: "Upload Successful", 
