@@ -444,74 +444,98 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
           {/* Spreadsheet Preview & Header Selection */}
           {showSpreadsheetPreview && parsedData && (fileType === 'csv' || fileType === 'xlsx') && (
             <div className="space-y-4">
+              {/* Header with controls */}
               <div className="flex items-center justify-between">
-                <h4 className="text-lg font-medium text-gray-900">Spreadsheet Preview</h4>
-                <div className="text-sm text-gray-600">
-                  {parsedData.rows.length} data rows detected
+                <div>
+                  <h4 className="text-lg font-medium text-gray-900">Review Your Data</h4>
+                  <p className="text-sm text-gray-600">
+                    {parsedData.rows.length} rows • {parsedData.headers.length} columns
+                  </p>
                 </div>
-              </div>
-              
-              {/* Header Row Selection */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">
-                  Header Row (Auto-detected: Row {selectedHeaderRow! + 1})
-                </Label>
-                <Select 
-                  value={selectedHeaderRow?.toString()} 
-                  onValueChange={(value) => {
-                    const newHeaderRow = parseInt(value);
-                    setSelectedHeaderRow(newHeaderRow);
-                    // Re-parse data with new header row
-                    const newHeaders = parsedData.rows[newHeaderRow] || parsedData.headers;
-                    const newDataRows = parsedData.rows.slice(newHeaderRow + 1);
-                    setParsedData(prev => prev ? {
-                      ...prev,
-                      headers: newHeaders,
-                      rows: newDataRows,
-                      detectedHeaderRow: newHeaderRow
-                    } : null);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select header row" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: Math.min(10, parsedData.rows.length + 1) }, (_, i) => {
-                      // Show actual row data for selection
-                      const allRows = [parsedData.headers, ...parsedData.rows];
-                      const rowData = allRows[i];
-                      return (
-                        <SelectItem key={i} value={i.toString()}>
-                          Row {i + 1}: {rowData?.slice(0, 3).join(' | ')}...
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center space-x-4">
+                  <div className="text-right">
+                    <Label className="text-xs font-medium text-gray-700">Header Row</Label>
+                    <Select 
+                      value={selectedHeaderRow?.toString()} 
+                      onValueChange={(value) => {
+                        const newHeaderRow = parseInt(value);
+                        setSelectedHeaderRow(newHeaderRow);
+                        // Re-parse data with new header row
+                        const allRows = [parsedData.headers, ...parsedData.rows];
+                        const newHeaders = allRows[newHeaderRow] || parsedData.headers;
+                        const newDataRows = allRows.slice(newHeaderRow + 1);
+                        setParsedData(prev => prev ? {
+                          ...prev,
+                          headers: newHeaders,
+                          rows: newDataRows,
+                          detectedHeaderRow: newHeaderRow
+                        } : null);
+                      }}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Row" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: Math.min(10, parsedData.rows.length + 1) }, (_, i) => {
+                          const allRows = [parsedData.headers, ...parsedData.rows];
+                          return (
+                            <SelectItem key={i} value={i.toString()}>
+                              Row {i + 1}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
 
-              {/* Data Preview */}
-              <div className="border rounded-lg overflow-hidden">
-                <div className="bg-gray-50 px-4 py-2 border-b">
-                  <h5 className="text-sm font-medium text-gray-700">Data Preview</h5>
-                </div>
-                <div className="overflow-x-auto max-h-64">
-                  <table className="w-full text-sm">
-                    <thead className="bg-blue-50">
-                      <tr>
+              {/* Editable Data Table */}
+              <div className="border rounded-lg overflow-hidden bg-white">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    {/* Headers */}
+                    <thead>
+                      <tr className="bg-blue-50 border-b border-blue-200">
+                        <th className="w-12 px-3 py-2 text-center text-xs font-medium text-gray-500">#</th>
                         {parsedData.headers.map((header, index) => (
-                          <th key={index} className="px-3 py-2 text-left font-medium text-blue-900 border-r border-blue-200 last:border-r-0">
-                            {header || `Column ${index + 1}`}
+                          <th key={index} className="px-3 py-2 text-left">
+                            <input
+                              type="text"
+                              value={header || `Column ${index + 1}`}
+                              onChange={(e) => {
+                                const newHeaders = [...parsedData.headers];
+                                newHeaders[index] = e.target.value;
+                                setParsedData(prev => prev ? { ...prev, headers: newHeaders } : null);
+                              }}
+                              className="w-full bg-transparent border-none outline-none font-medium text-blue-900 placeholder-blue-700"
+                              placeholder={`Column ${index + 1}`}
+                            />
                           </th>
                         ))}
                       </tr>
                     </thead>
+                    
+                    {/* Data Rows */}
                     <tbody>
-                      {parsedData.rows.slice(0, 5).map((row, rowIndex) => (
-                        <tr key={rowIndex} className="border-b border-gray-200 last:border-b-0">
+                      {parsedData.rows.slice(0, 10).map((row, rowIndex) => (
+                        <tr key={rowIndex} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="w-12 px-3 py-2 text-center text-xs text-gray-400 bg-gray-50">
+                            {rowIndex + 1}
+                          </td>
                           {row.map((cell, cellIndex) => (
-                            <td key={cellIndex} className="px-3 py-2 border-r border-gray-200 last:border-r-0">
-                              {cell || '-'}
+                            <td key={cellIndex} className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={cell || ''}
+                                onChange={(e) => {
+                                  const newRows = [...parsedData.rows];
+                                  newRows[rowIndex][cellIndex] = e.target.value;
+                                  setParsedData(prev => prev ? { ...prev, rows: newRows } : null);
+                                }}
+                                className="w-full bg-transparent border-none outline-none text-sm focus:bg-white focus:ring-1 focus:ring-blue-500 rounded px-1 py-1"
+                                placeholder="-"
+                              />
                             </td>
                           ))}
                         </tr>
@@ -519,8 +543,15 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
                     </tbody>
                   </table>
                 </div>
-                <div className="bg-gray-50 px-4 py-2 border-t text-xs text-gray-600">
-                  Showing first 5 rows of {parsedData.rows.length} total rows
+                
+                {/* Footer info */}
+                <div className="bg-gray-50 px-4 py-3 border-t flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    Showing first 10 of {parsedData.rows.length} total rows
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Click any cell to edit • Headers are editable
+                  </div>
                 </div>
               </div>
             </div>
