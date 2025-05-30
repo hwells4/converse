@@ -74,6 +74,7 @@ export function CommissionStatementConfirmation({
   const [statementData, setStatementData] = useState<CommissionStatement>({
     carrierId,
     carrierName: "",
+    carrierSalesforceId: "",
     statementAmount: 0,
     statementNotes: "",
     statementDate: new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
@@ -84,6 +85,7 @@ export function CommissionStatementConfirmation({
     setStatementData(prev => ({
       ...prev,
       carrierName: carrier?.name || "",
+      carrierSalesforceId: carrier?.salesforceId || "",
       statementAmount: calculateStatementAmount()
     }));
   }, [carrier, mappedTransactions]);

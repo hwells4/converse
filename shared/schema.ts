@@ -114,6 +114,7 @@ export type PDFParserWebhook = z.infer<typeof pdfParserWebhookSchema>;
 export const commissionStatementSchema = z.object({
   carrierId: z.number(),
   carrierName: z.string(),
+  carrierSalesforceId: z.string(),
   statementAmount: z.number(),
   statementNotes: z.string().optional(),
   statementDate: z.string(), // ISO date string
