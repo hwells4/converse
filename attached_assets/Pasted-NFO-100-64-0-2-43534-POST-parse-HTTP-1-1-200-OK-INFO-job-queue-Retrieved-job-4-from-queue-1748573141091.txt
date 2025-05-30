@@ -1,0 +1,37 @@
+NFO:     100.64.0.2:43534 - "POST /parse HTTP/1.1" 200 OK
+
+INFO:job_queue:Retrieved job 4 from queue
+
+INFO:worker:Processing job 4: uploads/2025-05-30_carrier-6_commission_2025-05-29_safeco_2_1748572801177.pdf
+
+INFO:s3_utils:Downloading s3://converseinsurance/uploads/2025-05-30_carrier-6_commission_2025-05-29_safeco_2_1748572801177.pdf to /tmp/tmp3mhc0kz2.pdf
+
+INFO:s3_utils:Successfully downloaded uploads/2025-05-30_carrier-6_commission_2025-05-29_safeco_2_1748572801177.pdf (1582093 bytes)
+
+INFO:worker:Downloaded PDF from S3: uploads/2025-05-30_carrier-6_commission_2025-05-29_safeco_2_1748572801177.pdf
+
+INFO:doctly_client:Processing PDF with Doctly: /tmp/tmp3mhc0kz2.pdf (1582093 bytes)
+
+INFO:doctly_client:Document uploaded with ID fe508c87-9665-42d9-84bb-e755092741c9, status: PENDING
+
+INFO:doctly_client:Starting to poll Doctly document fe508c87-9665-42d9-84bb-e755092741c9
+
+INFO:doctly_client:Document fe508c87-9665-42d9-84bb-e755092741c9 completed successfully
+
+INFO:doctly_client:Downloading from URL: https://daa-prod-app-bucket.s3.amazonaws.com/cc681aa8-3727-4cfc-877a-f235648decd3/f4679545-7ce2-40bd-a4f1-fce3ff23955f.md?response-content-disposition=attachment%3B%20filename%3D%22tmp3mhc0kz2.md%22%3B%20filename%2A%3DUTF-8%7Butf8_filename%7D&response-content-type=text%2Fmarkdown&AWSAccessKeyId=ASIAQQABDPPZBUUG3KVX&Signature=0NHjmoHWDXLABGh9V6vKTsW%2FyBY%3D&x-amz-security-token=IQoJb3JpZ2luX2VjENP%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLWVhc3QtMSJIMEYCIQDQwFZg44lcicl315q6c3xurQKxlebH1lNCAAHjUGFgQwIhANPehSetkwk9DuOiRoUJeTL2L8Ik9pc5gDbnDbAm8V5NKoAECJv%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQABoMMDM0MzYyMDYzODU4IgzZ%2B%2BwMIrejrmP0OOsq1ANf2mwDsgrpeJPxPA5WvA19DPBJGQ31vV0WJIlOSPkvL%2FVmn4%2B3LXyGpGemzd81tR2w4iFlyf%2FLYR5jefYdlUMDmnWGfwW2IzNvZO%2BFDrkC0G4MgInoKcm6T%2BEs3Fx%2Fn9KpjQ2FmX%2FybiTpH1wxJBIUCs4Zo%2Fgg9sxCSdTLZib%2FLzKAFt3Oiun1VmIvL%2BPwwrYXuL6M8xrxcflgUZe4lygHjAxq29dldSjPh9fCetnb9FyO7G6JEtbzxwc4hYflkkZTOSxiGBNS1%2F0Ey1pflzKexNjDNrC3AKW8gqeG%2BZ%2Fj0RdIIcA7%2BfLUwKysL592w5t%2Bp1sXvlBH%2F3LieyouhKfi9sKSHkDiZ1YTvtLFOlO3OjdQRFdJlq8j23QyWkXfMLZeBly5UgCkBYa4px%2BnsaQiRWa6keqA6zgV8gw1DbXW2QeEFPkLoeXAJsXHbmpMvDg1iLN3jytGZrYOUKm%2FG0C2qYqlluJsZ88WqQKR6kfMaF6X9jdQUSCy0AKvtfpqgCo6tCxTM6VcIuwwPHcvYj6XjHReizPfz70UblVsck%2F2uq5uOrGtXUoJHiBDLS%2BQdCl9WGd2GSJXVaIzPXXrm322JfAjmbXR64gQdIvkZntKCvEIkfcwrazkwQY6pAHBgfOjqDf2oRn%2Bl5yL%2Bfn1FAnAqcDdkXwKj%2FaZfyxRCCZl1S7rCHbZVoXbGK8btO%2FoqeqN2%2BTEuojMPxsmfD%2F8eGtFJsIZ9K2RAZcQ4bwuL9DwkvIaJ95nBiSjsz50TBpgMVk2GLA8JYKiB%2FJPFCTfE2v80iMdDu91zK1koodSmA9gMLrJx8sw2mK3GTPK2SpS5EZZTbwDlzxcZnY7ZFDXKGolvg%3D%3D&Expires=1748576665
+
+INFO:doctly_client:Downloaded Markdown content (32929 characters)
+
+INFO:worker:Doctly processing completed
+
+INFO:worker:Converted Markdown to CSV
+
+INFO:s3_utils:Uploading /tmp/tmpsqvimfzh.csv to s3://converseinsurance/processed/2025-05-30_carrier-6_commission_2025-05-29_safeco_2_1748572801177.csv (8410 bytes)
+
+INFO:s3_utils:Successfully uploaded to https://s3-us-east-2.amazonaws.com/converseinsurance/processed/2025-05-30_carrier-6_commission_2025-05-29_safeco_2_1748572801177.csv
+
+INFO:worker:Uploaded CSV to S3: processed/2025-05-30_carrier-6_commission_2025-05-29_safeco_2_1748572801177.csv
+
+ERROR:worker:Failed to send webhook to https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/api/pdf-parse-webhook: 404 Client Error: Not Found for url: https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev/api/pdf-parse-webhook
+
+INFO:worker:Job 4 completed successfully
