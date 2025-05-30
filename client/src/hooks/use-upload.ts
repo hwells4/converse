@@ -22,6 +22,46 @@ export function useUpload() {
   const updateDocument = useUpdateDocument();
   const { toast } = useToast();
 
+  const startPolling = (documentId: number) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const document = await AWSService.checkProcessingStatus(documentId);
+        
+        if (document.status === "processed" || document.status === "review_pending") {
+          clearInterval(pollInterval);
+          setUploadState(prev => ({ ...prev, isProcessing: false }));
+          
+          toast({
+            title: "Processing Complete",
+            description: "Document has been processed and is ready for review.",
+          });
+        } else if (document.status === "failed") {
+          clearInterval(pollInterval);
+          setUploadState(prev => ({ ...prev, isProcessing: false, error: "Processing failed" }));
+          
+          toast({
+            title: "Processing Failed",
+            description: "Document processing encountered an error.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Polling error:", error);
+      }
+    }, 5000);
+    
+    setTimeout(() => clearInterval(pollInterval), 300000);
+  };
+
+  const resetUpload = () => {
+    setUploadState({
+      isUploading: false,
+      progress: 0,
+      isProcessing: false,
+      error: null,
+    });
+  };
+
   const uploadFile = async (
     file: File, 
     documentType: "commission" | "renewal", 
@@ -36,13 +76,22 @@ export function useUpload() {
     });
 
     try {
-      // Validate file
-      if (file.type !== "application/pdf") {
-        throw new Error("Only PDF files are allowed");
-      }
-
+      // Validate file size
       if (file.size > 50 * 1024 * 1024) {
         throw new Error("File size must be less than 50MB");
+      }
+
+      // Validate file type - now supports PDF, CSV, and XLSX
+      const allowedTypes = [
+        "application/pdf",
+        "text/csv", 
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      ];
+      const allowedExtensions = ['.pdf', '.csv', '.xlsx'];
+      const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+      
+      if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+        throw new Error("Only PDF, CSV, and XLSX files are allowed");
       }
 
       // Upload to S3 via backend proxy
@@ -76,42 +125,64 @@ export function useUpload() {
         metadata: null,
       });
 
-      setUploadState(prev => ({ ...prev, isUploading: false, isProcessing: true }));
+      setUploadState(prev => ({ ...prev, isUploading: false, isProcessing: false }));
 
-      // Trigger Lambda processing via backend proxy
-      try {
-        const jobId = await AWSService.triggerTextractLambda({ 
-          s3Key, 
-          documentType, 
-          carrierId 
-        });
-        
+      // Check if this is a spreadsheet file (CSV/XLSX)
+      const isSpreadsheet = fileExtension === '.csv' || fileExtension === '.xlsx';
+      
+      if (isSpreadsheet) {
+        // For spreadsheet files, update status to review_pending and return document for field mapping
         await updateDocument.mutateAsync({
           id: document.id,
           updates: {
-            status: "processing",
-            textractJobId: jobId,
+            status: "review_pending",
           },
         });
 
         toast({
           title: "Upload Successful",
-          description: `${documentType === "commission" ? "Commission Statement" : "Renewal Report"} uploaded and processing started.`,
+          description: `${documentType === "commission" ? "Commission Statement" : "Renewal Report"} uploaded successfully. Ready for field mapping.`,
         });
 
-        // Start polling for results using document status
-        startPolling(document.id);
+        return document; // Return document for field mapping
+      } else {
+        // For PDF files, trigger Textract processing
+        setUploadState(prev => ({ ...prev, isProcessing: true }));
+        
+        try {
+          const jobId = await AWSService.triggerTextractLambda({ 
+            s3Key, 
+            documentType, 
+            carrierId 
+          });
+          
+          await updateDocument.mutateAsync({
+            id: document.id,
+            updates: {
+              status: "processing",
+              textractJobId: jobId,
+            },
+          });
 
-      } catch (processingError) {
-        await updateDocument.mutateAsync({
-          id: document.id,
-          updates: {
-            status: "failed",
-            processingError: processingError instanceof Error ? processingError.message : "Processing failed",
-          },
-        });
+          toast({
+            title: "Upload Successful",
+            description: `${documentType === "commission" ? "Commission Statement" : "Renewal Report"} uploaded and processing started.`,
+          });
 
-        throw processingError;
+          // Start polling for results using document status
+          startPolling(document.id);
+
+        } catch (processingError) {
+          await updateDocument.mutateAsync({
+            id: document.id,
+            updates: {
+              status: "failed",
+              processingError: processingError instanceof Error ? processingError.message : "Processing failed",
+            },
+          });
+
+          throw processingError;
+        }
       }
 
     } catch (error) {
@@ -124,56 +195,6 @@ export function useUpload() {
         variant: "destructive",
       });
     }
-  };
-
-  const startPolling = (documentId: number) => {
-    const pollInterval = setInterval(async () => {
-      try {
-        // Use the new backend API to check document status
-        const document = await AWSService.checkProcessingStatus(documentId);
-        
-        if (document.status === "processed" || document.status === "review_pending") {
-          clearInterval(pollInterval);
-          
-          setUploadState(prev => ({ ...prev, isProcessing: false }));
-          
-          const statusMessage = document.status === "review_pending" 
-            ? "Your document has been processed and is ready for review."
-            : "Your document has been processed and the data is available for download.";
-          
-          toast({
-            title: "Processing Complete",
-            description: statusMessage,
-          });
-        } else if (document.status === "failed") {
-          clearInterval(pollInterval);
-          setUploadState(prev => ({ ...prev, isProcessing: false }));
-          
-          toast({
-            title: "Processing Failed",
-            description: document.processingError || "Document processing failed.",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        console.error("Polling error:", error);
-      }
-    }, 5000); // Poll every 5 seconds
-
-    // Stop polling after 5 minutes
-    setTimeout(() => {
-      clearInterval(pollInterval);
-      setUploadState(prev => ({ ...prev, isProcessing: false }));
-    }, 5 * 60 * 1000);
-  };
-
-  const resetUpload = () => {
-    setUploadState({
-      isUploading: false,
-      progress: 0,
-      isProcessing: false,
-      error: null,
-    });
   };
 
   return {
