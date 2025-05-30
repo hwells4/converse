@@ -40,8 +40,23 @@ export function SearchableSelect({
   disabled = false,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false)
+  const [search, setSearch] = React.useState("")
   
   const selectedOption = options.find((option) => option.value === value)
+  
+  // Custom filter function for stricter matching
+  const filteredOptions = React.useMemo(() => {
+    if (!search) return options
+    
+    return options.filter((option) => {
+      const searchLower = search.toLowerCase()
+      const labelLower = option.label.toLowerCase()
+      
+      // Match from beginning of words
+      const words = labelLower.split(/\s+/)
+      return words.some(word => word.startsWith(searchLower)) || labelLower.startsWith(searchLower)
+    })
+  }, [options, search])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -58,17 +73,22 @@ export function SearchableSelect({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search..." />
-          <CommandList>
-            <CommandEmpty>No field found.</CommandEmpty>
+        <Command shouldFilter={false}>
+          <CommandInput 
+            placeholder="Search..." 
+            value={search}
+            onValueChange={setSearch}
+          />
+          <CommandList className="max-h-[200px] overflow-y-auto">
+            <CommandEmpty>No carriers found.</CommandEmpty>
             <CommandGroup>
-              {options.map((option) => (
+              {filteredOptions.map((option) => (
                 <CommandItem
                   key={option.value}
                   value={option.label}
                   onSelect={() => {
                     onValueChange(option.value === value ? "" : option.value)
+                    setSearch("")
                     setOpen(false)
                   }}
                 >
