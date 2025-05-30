@@ -339,7 +339,11 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
                             <ArrowRight className="h-4 w-4 text-gray-400" />
                             <div className="min-w-[200px]">
                               <SearchableSelect
-                                options={SALESFORCE_FIELDS}
+                                options={SALESFORCE_FIELDS.filter(field => {
+                                  // Allow fields that aren't already mapped by other columns
+                                  const usedFields = Object.values(fieldMapping).filter(val => val && val !== 'skip');
+                                  return field.value === 'skip' || !usedFields.includes(field.value) || fieldMapping[column.index] === field.value;
+                                })}
                                 value={fieldMapping[column.index] || ''}
                                 onValueChange={(value) => handleFieldMappingChange(column.index, value)}
                                 placeholder="Choose field..."

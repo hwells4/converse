@@ -696,7 +696,11 @@ export function CSVUploadWizard({
                             <SearchableSelect
                               options={[
                                 { value: "none", label: "Skip this column" },
-                                ...SALESFORCE_FIELDS
+                                ...SALESFORCE_FIELDS.filter(field => {
+                                  // Allow "skip" and fields that aren't already mapped by other columns
+                                  const usedFields = Object.values(fieldMapping).filter(val => val && val !== 'none');
+                                  return field.value === 'skip' || !usedFields.includes(field.value) || fieldMapping[index] === field.value;
+                                })
                               ]}
                               value={fieldMapping[index] || "none"}
                               onValueChange={(value) => handleMappingChange(index, value)}
