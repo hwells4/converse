@@ -417,7 +417,7 @@ export function CSVUploadWizard({
                     </span>
                   </div>
                 </div>
-                <ScrollArea className="flex-1" style={{ height: 'calc(100vh - 400px)' }}>
+                <div className="overflow-auto" style={{ height: 'calc(100vh - 400px)' }}>
                   <table className="w-full">
                     <thead className="bg-gray-50 sticky top-0">
                       <tr className={selectedHeaderRow === -1 ? 'bg-blue-100 border-2 border-blue-400' : ''}>
@@ -461,7 +461,7 @@ export function CSVUploadWizard({
                       ))}
                     </tbody>
                   </table>
-                </ScrollArea>
+                </div>
               </div>
             </div>
           )}
@@ -512,7 +512,7 @@ export function CSVUploadWizard({
                     <div>Status</div>
                   </div>
                 </div>
-                <ScrollArea className="flex-1">
+                <div className="overflow-auto flex-1">
                   <div className="space-y-0">
                     {headers.map((header, index) => (
                       <div key={index} className="px-6 py-4 border-b border-gray-100 hover:bg-gray-50">
@@ -567,7 +567,7 @@ export function CSVUploadWizard({
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
+                </div>
               </div>
             </div>
           )}
@@ -589,7 +589,7 @@ export function CSVUploadWizard({
 
               {/* Main editing interface - fills remaining space */}
               <div className="flex-1 mx-4 mb-4 border border-t-0 rounded-b-lg overflow-hidden bg-white">
-                <ScrollArea className="flex-1">
+                <div className="overflow-auto h-full">
                   <table className="w-full">
                     <thead className="bg-gray-50 sticky top-0">
                       <tr>
@@ -633,7 +633,7 @@ export function CSVUploadWizard({
                       ))}
                     </tbody>
                   </table>
-                </ScrollArea>
+                </div>
               </div>
             </div>
           )}
