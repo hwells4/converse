@@ -39,6 +39,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
   const [selectedHeaderRow, setSelectedHeaderRow] = useState<number | null>(null);
   const [fileType, setFileType] = useState<'pdf' | 'csv' | 'xlsx' | null>(null);
   const [showFieldMapping, setShowFieldMapping] = useState(false);
+  const [showSpreadsheetPreview, setShowSpreadsheetPreview] = useState(false);
   const { uploadState, uploadFile, resetUpload } = useUpload();
   const { data: documents } = useDocuments();
   const { data: carriers, isLoading: carriersLoading } = useCarriers();
@@ -187,23 +188,8 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
       setFileType(detectedFileType);
       setSelectedFile(file);
 
-      // For CSV/XLSX files, parse immediately
-      if (detectedFileType === 'csv' || detectedFileType === 'xlsx') {
-        try {
-          const parsed = await parseSpreadsheetFile(file);
-          setParsedData(parsed);
-          setSelectedHeaderRow(parsed.detectedHeaderRow);
-        } catch (error) {
-          toast({
-            title: "File Parse Error",
-            description: "Unable to parse the spreadsheet file. Please check the file format.",
-            variant: "destructive",
-          });
-          setSelectedFile(null);
-          setFileType(null);
-          return;
-        }
-      }
+      // Don't parse CSV/XLSX immediately - wait for upload button
+      // Just store the file for later processing
 
       // Check for duplicates
       if (checkForDuplicates(file)) {
@@ -248,10 +234,21 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
   };
 
   const handleSpreadsheetUpload = async () => {
-    if (!parsedData || selectedHeaderRow === null) return;
+    if (!selectedFile || (fileType !== 'csv' && fileType !== 'xlsx')) return;
     
-    // Show field mapping modal
-    setShowFieldMapping(true);
+    try {
+      // Parse the spreadsheet file now that upload is confirmed
+      const parsed = await parseSpreadsheetFile(selectedFile);
+      setParsedData(parsed);
+      setSelectedHeaderRow(parsed.detectedHeaderRow);
+      setShowSpreadsheetPreview(true);
+    } catch (error) {
+      toast({
+        title: "File Parse Error",
+        description: "Unable to parse the spreadsheet file. Please check the file format.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleFieldMappingComplete = async (fieldMapping: any) => {
@@ -297,6 +294,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     setSelectedHeaderRow(null);
     setFileType(null);
     setShowFieldMapping(false);
+    setShowSpreadsheetPreview(false);
     resetUpload();
     onClose();
   };
@@ -313,13 +311,18 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
     return documentType === "commission" ? "Commission Statement" : "Renewal Report";
   };
 
-  const canUpload = selectedFile && documentType && selectedCarrierId && !uploadState.isUploading && !uploadState.isProcessing && (fileType === 'pdf' || (parsedData && selectedHeaderRow !== null));
+  const canUpload = selectedFile && documentType && selectedCarrierId && !uploadState.isUploading && !uploadState.isProcessing;
   
   const getUploadButtonText = () => {
-    if (fileType === 'csv' || fileType === 'xlsx') {
+    if (showSpreadsheetPreview && (fileType === 'csv' || fileType === 'xlsx')) {
       return "Proceed to Field Mapping";
     }
     return "Upload Document";
+  };
+
+  const handleProceedToFieldMapping = () => {
+    if (!parsedData || selectedHeaderRow === null) return;
+    setShowFieldMapping(true);
   };
 
   return (
@@ -439,7 +442,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
           )}
 
           {/* Spreadsheet Preview & Header Selection */}
-          {parsedData && (fileType === 'csv' || fileType === 'xlsx') && (
+          {showSpreadsheetPreview && parsedData && (fileType === 'csv' || fileType === 'xlsx') && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">Spreadsheet Preview</h4>
@@ -596,7 +599,7 @@ export function UploadModal({ isOpen, onClose, documentType }: UploadModalProps)
             Cancel
           </Button>
           <Button
-            onClick={handleUpload}
+            onClick={showSpreadsheetPreview ? handleProceedToFieldMapping : handleUpload}
             disabled={!canUpload}
             className="bg-blue-600 hover:bg-blue-700"
           >
