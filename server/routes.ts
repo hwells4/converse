@@ -892,15 +892,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`✅ Document ${validatedPayload.documentId} status updated to salesforce_upload_pending`);
 
-      // Call N8N webhook
-      const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL;
-      if (!n8nWebhookUrl) {
-        console.error('❌ N8N_WEBHOOK_URL not configured');
-        return res.status(500).json({ 
-          success: false,
-          message: "N8N webhook URL not configured" 
-        });
-      }
+      // Call N8N webhook - Easy switching between test and production
+      const N8N_TEST_URL = "https://hwells4.app.n8n.cloud/webhook-test/832afa61-2bcc-433c-8df6-192009696764";
+      const N8N_PROD_URL = "https://hwells4.app.n8n.cloud/webhook/832afa61-2bcc-433c-8df6-192009696764";
+      
+      // Use environment variable or default to test URL
+      // Set N8N_WEBHOOK_URL environment variable to override, or change USE_PRODUCTION_N8N below
+      const USE_PRODUCTION_N8N = false; // Change this to true for production
+      
+      const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || (USE_PRODUCTION_N8N ? N8N_PROD_URL : N8N_TEST_URL);
+      
+      console.log(`🔗 Using N8N webhook: ${USE_PRODUCTION_N8N ? 'PRODUCTION' : 'TEST'} - ${n8nWebhookUrl}`);
 
       console.log('🚀 Sending data to N8N webhook...');
       const n8nResponse = await fetch(n8nWebhookUrl, {
