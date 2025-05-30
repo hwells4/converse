@@ -19,6 +19,20 @@ const lambdaInvocationSchema = z.object({
   carrierId: z.number().positive(),
 });
 
+const pdfParserTriggerSchema = z.object({
+  s3Key: z.string().min(1),
+  documentType: z.enum(["commission", "renewal"]),
+  carrierId: z.number().positive(),
+  documentId: z.number().positive(),
+});
+
+const pdfParserWebhookSchema = z.object({
+  status: z.enum(["success", "error"]),
+  document_id: z.number().positive(),
+  csv_url: z.string().url().optional(),
+  error_message: z.string().optional(),
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Carrier management endpoints
   app.get("/api/carriers", async (req, res) => {
@@ -123,6 +137,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Lambda invocation error:", error);
       res.status(500).json({ message: "Failed to start document processing" });
+    }
+  });
+
+  // PDF Parser service trigger endpoint
+  app.post("/api/pdf-parser/trigger", async (req, res) => {
+    console.log('🔵 Received PDF parser trigger request');
+    console.log('🔵 Request body:', req.body);
+    
+    try {
+      const { s3Key, documentType, carrierId, documentId } = pdfParserTriggerSchema.parse(req.body);
+      console.log('✅ PDF parser request validation passed:', { s3Key, documentType, carrierId, documentId });
+      
+      // Construct webhook URL
+      const webhookUrl = `${req.protocol}://${req.get('host')}/api/pdf-parse-webhook`;
+      console.log('🔗 Webhook URL:', webhookUrl);
+      
+      // Prepare request payload for Railway PDF parser service
+      const parserPayload = {
+        s3_bucket: "converseinsurance",
+        s3_key: s3Key,
+        webhook_url: webhookUrl,
+        document_id: documentId
+      };
+      
+      console.log('📤 Sending request to PDF parser service:', parserPayload);
+      
+      // Send request to Railway PDF parser service
+      const response = await fetch('https://pdfparser-production-f216.up.railway.app/parse', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(parserPayload),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ PDF parser service error:', errorText);
+        throw new Error(`PDF parser service error: ${response.status} ${errorText}`);
+      }
+      
+      console.log('✅ PDF parser service request successful');
+      res.json({ status: "parsing_started" });
+      
+    } catch (error) {
+      console.error('💥 PDF parser trigger error:', error);
+      
+      if (error instanceof z.ZodError) {
+        console.error('❌ PDF parser validation errors:', error.errors);
+        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+      }
+      console.error("PDF parser trigger error:", error);
+      res.status(500).json({ message: "Failed to start PDF parsing" });
+    }
+  });
+
+  // PDF Parser webhook endpoint
+  app.post("/api/pdf-parse-webhook", async (req, res) => {
+    console.log('🔵 Received PDF parser webhook');
+    console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
+    
+    try {
+      const { status, document_id, csv_url, error_message } = pdfParserWebhookSchema.parse(req.body);
+      console.log('✅ Webhook validation passed:', { status, document_id, csv_url, error_message });
+      
+      if (status === "success" && csv_url) {
+        // Extract CSV S3 key from the URL
+        const csvS3Key = csv_url.replace('https://converseinsurance.s3.us-east-2.amazonaws.com/', '');
+        
+        // Update document with success status and CSV location
+        await storage.updateDocument(document_id, {
+          status: "review_pending",
+          csvS3Key: csvS3Key,
+          csvUrl: csv_url,
+          processedAt: new Date(),
+        });
+        
+        console.log(`✅ Document ${document_id} updated with CSV: ${csvS3Key}`);
+        
+      } else if (status === "error") {
+        // Update document with error status
+        await storage.updateDocument(document_id, {
+          status: "failed",
+          processingError: error_message || "PDF parsing failed",
+        });
+        
+        console.log(`❌ Document ${document_id} marked as failed: ${error_message}`);
+      }
+      
+      res.json({ success: true, message: "Webhook processed successfully" });
+      
+    } catch (error) {
+      console.error('💥 PDF parser webhook error:', error);
+      
+      if (error instanceof z.ZodError) {
+        console.error('❌ Webhook validation errors:', error.errors);
+        return res.status(400).json({ message: "Invalid webhook data", errors: error.errors });
+      }
+      
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to process webhook",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

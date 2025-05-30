@@ -161,22 +161,23 @@ export class AWSService {
   }
 
   /**
-   * Trigger Lambda function via backend endpoint
+   * Trigger PDF Parser service via backend endpoint
    */
-  static async triggerTextractLambda({ s3Key, documentType, carrierId }: LambdaInvocationParams): Promise<string> {
+  static async triggerPDFParser({ s3Key, documentType, carrierId, documentId }: PDFParserParams): Promise<void> {
     try {
-      console.log('🚀 Starting Lambda invocation...');
-      console.log('📋 Lambda params:', { s3Key, documentType, carrierId });
-      console.log('🔗 Lambda API URL:', `${this.apiBaseUrl}/api/lambda/invoke-textract`);
+      console.log('🚀 Starting PDF parser invocation...');
+      console.log('📋 PDF parser params:', { s3Key, documentType, carrierId, documentId });
+      console.log('🔗 PDF parser API URL:', `${this.apiBaseUrl}/api/pdf-parser/trigger`);
 
       const requestBody = {
         s3Key,
         documentType,
         carrierId,
+        documentId,
       };
-      console.log('📤 Lambda request body:', requestBody);
+      console.log('📤 PDF parser request body:', requestBody);
 
-      const response = await fetch(`${this.apiBaseUrl}/api/lambda/invoke-textract`, {
+      const response = await fetch(`${this.apiBaseUrl}/api/pdf-parser/trigger`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,31 +185,26 @@ export class AWSService {
         body: JSON.stringify(requestBody),
       });
 
-      console.log('📥 Lambda response status:', response.status);
-      console.log('📥 Lambda response headers:', Object.fromEntries(response.headers.entries()));
+      console.log('📥 PDF parser response status:', response.status);
+      console.log('📥 PDF parser response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Lambda invocation failed:', errorText);
+        console.error('❌ PDF parser invocation failed:', errorText);
         let error;
         try {
           error = JSON.parse(errorText);
         } catch {
           error = { message: errorText };
         }
-        throw new Error(error.message || 'Failed to start document processing');
+        throw new Error(error.message || 'Failed to start PDF parsing');
       }
 
-      const responseData = await response.json();
-      console.log('✅ Lambda response data:', responseData);
-      
-      const { jobId } = responseData;
-      console.log('✅ Lambda invocation successful, jobId:', jobId);
-      return jobId;
+      console.log('✅ PDF parser invocation successful');
     } catch (error) {
-      console.error("💥 Lambda invocation failed with error:", error);
+      console.error("💥 PDF parser invocation failed with error:", error);
       console.error("💥 Error stack:", error instanceof Error ? error.stack : 'No stack trace');
-      throw new Error(`Failed to start document processing: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`Failed to start PDF parsing: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
