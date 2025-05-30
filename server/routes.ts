@@ -890,12 +890,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9_-]/g, '_');
       const s3Key = `processed-csv/${new Date().toISOString().split('T')[0]}_carrier-${carrierId}_${sanitizedFileName}_${timestamp}.csv`;
 
-      // Convert array data back to CSV format
-      const csvContent = csvData.map((row: any) => 
-        Object.values(row).map((value: any) => 
-          typeof value === 'string' && value.includes(',') ? `"${value}"` : value
-        ).join(',')
-      ).join('\n');
+      // Convert array data back to CSV format with headers
+      let csvContent = '';
+      
+      if (csvData.length > 0) {
+        // Extract headers from the first row (excluding internal fields like _originalIndex)
+        const headers = Object.keys(csvData[0]).filter(key => !key.startsWith('_'));
+        const headerRow = headers.map(header => 
+          typeof header === 'string' && header.includes(',') ? `"${header}"` : header
+        ).join(',');
+        
+        // Create data rows
+        const dataRows = csvData.map((row: any) => 
+          headers.map(header => {
+            const value = row[header];
+            return typeof value === 'string' && value.includes(',') ? `"${value}"` : value;
+          }).join(',')
+        );
+        
+        csvContent = [headerRow, ...dataRows].join('\n');
+      }
 
       // Upload to S3
       const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3');
