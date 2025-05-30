@@ -499,7 +499,7 @@ export function CSVUploadWizard({
               </div>
 
               {/* Main mapping interface - fills remaining space */}
-              <div className="flex-1 mx-4 mb-4 border rounded-lg overflow-hidden bg-white">
+              <div className="flex-1 mx-4 mb-4 border rounded-lg overflow-hidden bg-white flex flex-col">
                 <div className="bg-gray-50 px-6 py-3 border-b flex items-center space-x-2 flex-shrink-0">
                   <Table className="h-5 w-5" />
                   <span className="font-semibold text-gray-900">Column Mapping</span>
@@ -512,7 +512,7 @@ export function CSVUploadWizard({
                     <div>Status</div>
                   </div>
                 </div>
-                <div className="overflow-auto flex-1">
+                <div className="overflow-auto flex-1 min-h-0">
                   <div className="space-y-0">
                     {headers.map((header, index) => (
                       <div key={index} className="px-6 py-4 border-b border-gray-100 hover:bg-gray-50">
