@@ -363,20 +363,34 @@ export default function Documents() {
                         {format(new Date(document.uploadedAt), "MMM dd, yyyy 'at' h:mm a")}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {document.csvUrl ? (
+                        {/* Actions based on document status - Show review for all processed documents */}
+                        {(document.status === "processed" || document.status === "review_pending") ? (
                           <div className="flex items-center space-x-1">
-                            {/* Primary Action Button - Always show Review for documents with CSV */}
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                console.log("Review button clicked for document:", document.id, "status:", document.status);
-                                handleOpenCSVWizard(document);
-                              }}
-                              className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Review
-                            </Button>
+                            {/* Primary Action Button */}
+                            {document.status === "review_pending" ? (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  console.log("Review button clicked for document:", document.id, "status:", document.status);
+                                  handleOpenCSVWizard(document);
+                                }}
+                                className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Review
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  handleOpenCSVWizard(document);
+                                }}
+                                className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                Preview
+                              </Button>
+                            )}
                             
                             {/* Dropdown Menu */}
                             <DropdownMenu>
@@ -389,21 +403,22 @@ export default function Documents() {
                                 <DropdownMenuItem
                                   onClick={() => {
                                     console.log("CSV Preview dropdown clicked for document:", document.id);
-                                    setReviewDocumentId(null); // Clear review modal state
-                                    setSelectedDocumentId(document.id);
+                                    handleOpenCSVWizard(document);
                                   }}
                                   className="cursor-pointer"
                                 >
                                   <Eye className="h-4 w-4 mr-2" />
                                   View CSV Preview
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleDownloadCSV(document.csvUrl!, document.originalName)}
-                                  className="cursor-pointer"
-                                >
-                                  <Download className="h-4 w-4 mr-2" />
-                                  Download CSV
-                                </DropdownMenuItem>
+                                {document.csvUrl && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleDownloadCSV(document.csvUrl!, document.originalName)}
+                                    className="cursor-pointer"
+                                  >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Download CSV
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem
                                   onClick={() => handleDeleteDocument(document.id, document.originalName)}
                                   disabled={deletingDocumentId === document.id}
