@@ -25,24 +25,37 @@ export function RecentDocuments() {
 
   const handleOpenCSVWizard = async (document: any) => {
     try {
-      // For now, we'll use placeholder data since the CSV wizard expects parsed CSV data
-      // In your FastAPI implementation, this will fetch the actual CSV data
-      const placeholderData = {
-        headers: ["Policy Number", "Insured Name", "Premium", "Commission"],
-        rows: [["SAMPLE001", "Sample Client", "$1000", "$100"]],
+      console.log("Opening CSV wizard for document:", document);
+      
+      // Fetch the actual CSV data from the backend
+      const response = await fetch(`/api/documents/${document.id}/csv-data`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch CSV data: ${response.status} ${response.statusText}`);
+      }
+      
+      const csvData = await response.json();
+      console.log("Received CSV data:", csvData);
+      
+      // Transform the data to match the CSV wizard format
+      const parsedData = {
+        headers: csvData.headers || [],
+        rows: csvData.rows?.map((row: any[]) => 
+          row.map((cell: any) => typeof cell === 'object' ? cell.value : cell)
+        ) || [],
         detectedHeaderRow: 0
       };
       
       setCsvWizardData({
         isOpen: true,
-        parsedData: placeholderData,
+        parsedData,
         fileName: document.originalName || document.filename,
         carrierId: document.carrierId || 1
       });
     } catch (error) {
+      console.error("Error opening CSV wizard:", error);
       toast({
         title: "Error",
-        description: "Failed to open document for review",
+        description: "Failed to load document data for review",
         variant: "destructive",
       });
     }

@@ -7,8 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
-import { CSVPreview } from "@/components/csv-preview";
-import { FieldMappingModal } from "@/components/field-mapping-modal";
+import { CSVUploadWizard } from "@/components/csv-upload-wizard";
 import { ToastNotifications } from "@/components/toast-notifications";
 import { FileText, Download, Eye, ArrowLeft, Search, Filter, Shield, Trash2, ChevronDown, CheckCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -19,8 +18,50 @@ export default function Documents() {
   const { data: documents, isLoading } = useDocuments();
   const deleteDocument = useDeleteDocument();
   const { toast } = useToast();
-  const [selectedDocumentId, setSelectedDocumentId] = useState<number | null>(null);
-  const [reviewDocumentId, setReviewDocumentId] = useState<number | null>(null);
+  const [csvWizardData, setCsvWizardData] = useState<{
+    isOpen: boolean;
+    parsedData: any;
+    fileName: string;
+    carrierId: number;
+  } | null>(null);
+
+  const handleOpenCSVWizard = async (document: any) => {
+    try {
+      console.log("Opening CSV wizard for document:", document);
+      
+      // Fetch the actual CSV data from the backend
+      const response = await fetch(`/api/documents/${document.id}/csv-data`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch CSV data: ${response.status} ${response.statusText}`);
+      }
+      
+      const csvData = await response.json();
+      console.log("Received CSV data:", csvData);
+      
+      // Transform the data to match the CSV wizard format
+      const parsedData = {
+        headers: csvData.headers || [],
+        rows: csvData.rows?.map((row: any[]) => 
+          row.map((cell: any) => typeof cell === 'object' ? cell.value : cell)
+        ) || [],
+        detectedHeaderRow: 0
+      };
+      
+      setCsvWizardData({
+        isOpen: true,
+        parsedData,
+        fileName: document.originalName || document.filename,
+        carrierId: document.carrierId || 1
+      });
+    } catch (error) {
+      console.error("Error opening CSV wizard:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load document data for review",
+        variant: "destructive",
+      });
+    }
+  };
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -329,8 +370,7 @@ export default function Documents() {
                               size="sm"
                               onClick={() => {
                                 console.log("Review button clicked for document:", document.id, "status:", document.status);
-                                setSelectedDocumentId(null); // Clear CSV preview state
-                                setReviewDocumentId(document.id);
+                                handleOpenCSVWizard(document);
                               }}
                               className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
                             >
