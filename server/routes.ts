@@ -153,7 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parserPayload = {
         s3_bucket: "converseinsurance",
         s3_key: s3Key,
-        webhook_url: webhookUrl,
+        webhook_url: `${webhookUrl}?document_id=${documentId}`,
         document_id: documentId
       };
       
@@ -203,27 +203,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('🔵 Timestamp:', new Date().toISOString());
     console.log('🔵 Request headers:', JSON.stringify(req.headers, null, 2));
     console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
-    console.log('🔵 Raw body type:', typeof req.body);
-    console.log('🔵 Body keys:', Object.keys(req.body || {}));
-    console.log('🔵 Request IP:', req.ip || req.connection.remoteAddress);
+    console.log('🔵 Query params:', req.query);
     console.log('🔵 =====================================');
     
     try {
-      // Log raw body for debugging
-      console.log('🔍 Attempting to parse webhook body...');
-      console.log('🔍 Expected schema: { status: "success"|"error", csv_url?: string, original_filename: string, message?: string }');
+      // Get document ID from query parameter (more reliable than filename matching)
+      const documentId = req.query.document_id ? parseInt(req.query.document_id as string) : null;
       
-      const { status, csv_url, original_filename, message } = pdfParserWebhookSchema.parse(req.body);
-      console.log('✅ Webhook validation passed:', { status, csv_url, original_filename, message });
+      if (!documentId) {
+        console.error('❌ No document_id provided in webhook URL');
+        return res.status(400).json({ message: "Document ID required" });
+      }
       
-      // Find the document by S3 key (original_filename is actually the S3 key)
-      const document = await storage.getDocumentByS3Key(original_filename);
+      const { status, csv_url, message } = pdfParserWebhookSchema.parse(req.body);
+      console.log('✅ Webhook validation passed:', { status, csv_url, documentId, message });
+      
+      // Find the document by ID (much more reliable)
+      const document = await storage.getDocument(documentId);
       
       if (!document) {
-        console.error(`❌ Document not found for S3 key: ${original_filename}`);
-        console.log('🔍 Searching all documents to debug...');
-        const allDocs = await storage.getDocuments();
-        console.log('🔍 Available S3 keys:', allDocs.map(d => d.s3Key));
+        console.error(`❌ Document not found for ID: ${documentId}`);
         return res.status(404).json({ message: "Document not found" });
       }
       
