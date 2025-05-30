@@ -123,7 +123,11 @@ export type CommissionStatement = z.infer<typeof commissionStatementSchema>;
 // N8N webhook payload schema for Salesforce upload
 export const n8nWebhookPayloadSchema = z.object({
   statement: commissionStatementSchema,
-  transactions: z.array(z.record(z.string(), z.any())), // Array of mapped transaction data
+  transactions: z.object({
+    csvS3Key: z.string(),
+    csvUrl: z.string(),
+    headers: z.array(z.string()),
+  }), // CSV data uploaded to S3 instead of raw data
   transactionCount: z.number(),
   documentId: z.number(),
   fileName: z.string(),
