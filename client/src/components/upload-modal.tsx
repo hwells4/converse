@@ -15,7 +15,6 @@ import { Upload, FileText, X, Check, AlertCircle, Calendar, Building2 } from "lu
 import { format } from "date-fns";
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
-import { CSVUploadWizard } from "./csv-upload-wizard";
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -36,12 +35,7 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
   const [selectedCarrierId, setSelectedCarrierId] = useState<string>("");
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [duplicateDocument, setDuplicateDocument] = useState<any>(null);
-  const [parsedData, setParsedData] = useState<ParsedSpreadsheetData | null>(null);
-  const [selectedHeaderRow, setSelectedHeaderRow] = useState<number | null>(null);
   const [fileType, setFileType] = useState<'pdf' | 'csv' | 'xlsx' | null>(null);
-  const [showFieldMapping, setShowFieldMapping] = useState(false);
-  const [showSpreadsheetPreview, setShowSpreadsheetPreview] = useState(false);
-  const [uploadedDocumentId, setUploadedDocumentId] = useState<number | null>(null);
   const { uploadState, uploadFile, resetUpload } = useUpload();
   const { data: documents } = useDocuments();
   const { data: carriers, isLoading: carriersLoading } = useCarriers();
@@ -190,9 +184,6 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
       setFileType(detectedFileType);
       setSelectedFile(file);
 
-      // Don't parse CSV/XLSX immediately - wait for upload button
-      // Just store the file for later processing
-
       // Check for duplicates
       if (checkForDuplicates(file)) {
         setShowDuplicateWarning(true);
@@ -249,19 +240,6 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
     }
   };
 
-  const handleFieldMappingComplete = async (wizardResult: any) => {
-    // TODO: Send data to Salesforce via N8N webhook
-    console.log("CSV upload wizard complete, ready for Salesforce:", wizardResult);
-    
-    toast({
-      title: "Success",
-      description: "Data processed and ready for Salesforce upload!",
-    });
-    
-    setShowFieldMapping(false);
-    handleClose();
-  };
-
   const handleDuplicateConfirm = async () => {
     setShowDuplicateWarning(false);
     if (selectedFile && documentType && selectedCarrierId) {
@@ -282,12 +260,7 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
     setSelectedCarrierId("");
     setShowDuplicateWarning(false);
     setDuplicateDocument(null);
-    setParsedData(null);
-    setSelectedHeaderRow(null);
     setFileType(null);
-    setShowFieldMapping(false);
-    setShowSpreadsheetPreview(false);
-    setUploadedDocumentId(null);
     resetUpload();
     onClose();
   };
@@ -305,18 +278,6 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
   };
 
   const canUpload = selectedFile && documentType && selectedCarrierId && !uploadState.isUploading && !uploadState.isProcessing;
-  
-  const getUploadButtonText = () => {
-    if (showSpreadsheetPreview && (fileType === 'csv' || fileType === 'xlsx')) {
-      return "Proceed to Field Mapping";
-    }
-    return "Upload Document";
-  };
-
-  const handleProceedToFieldMapping = () => {
-    if (!parsedData || selectedHeaderRow === null) return;
-    setShowFieldMapping(true);
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -417,135 +378,14 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
                   <p className="font-medium text-gray-900">{selectedFile.name}</p>
                   <p className="text-sm text-gray-600">{formatFileSize(selectedFile.size)} • {fileType?.toUpperCase()}</p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedFile(null);
-                    setParsedData(null);
-                    setSelectedHeaderRow(null);
-                    setFileType(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setSelectedFile(null)}
+                  className="text-gray-500 hover:text-gray-700"
                 >
                   <X className="h-4 w-4" />
                 </Button>
-              </div>
-            </div>
-          )}
-
-          {/* Spreadsheet Preview & Header Selection */}
-          {showSpreadsheetPreview && parsedData && (fileType === 'csv' || fileType === 'xlsx') && (
-            <div className="space-y-4">
-              {/* Header with controls */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-lg font-medium text-gray-900">Review Your Data</h4>
-                  <p className="text-sm text-gray-600">
-                    {parsedData.rows.length} rows • {parsedData.headers.length} columns
-                  </p>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="text-right">
-                    <Label className="text-xs font-medium text-gray-700">Header Row</Label>
-                    <Select 
-                      value={selectedHeaderRow?.toString()} 
-                      onValueChange={(value) => {
-                        const newHeaderRow = parseInt(value);
-                        setSelectedHeaderRow(newHeaderRow);
-                        // Re-parse data with new header row
-                        const allRows = [parsedData.headers, ...parsedData.rows];
-                        const newHeaders = allRows[newHeaderRow] || parsedData.headers;
-                        const newDataRows = allRows.slice(newHeaderRow + 1);
-                        setParsedData(prev => prev ? {
-                          ...prev,
-                          headers: newHeaders,
-                          rows: newDataRows,
-                          detectedHeaderRow: newHeaderRow
-                        } : null);
-                      }}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue placeholder="Row" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: Math.min(10, parsedData.rows.length + 1) }, (_, i) => {
-                          const allRows = [parsedData.headers, ...parsedData.rows];
-                          return (
-                            <SelectItem key={i} value={i.toString()}>
-                              Row {i + 1}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Editable Data Table */}
-              <div className="border rounded-lg overflow-hidden bg-white">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    {/* Headers */}
-                    <thead>
-                      <tr className="bg-blue-50 border-b border-blue-200">
-                        <th className="w-12 px-3 py-2 text-center text-xs font-medium text-gray-500">#</th>
-                        {parsedData.headers.map((header, index) => (
-                          <th key={index} className="px-3 py-2 text-left">
-                            <input
-                              type="text"
-                              value={header || `Column ${index + 1}`}
-                              onChange={(e) => {
-                                const newHeaders = [...parsedData.headers];
-                                newHeaders[index] = e.target.value;
-                                setParsedData(prev => prev ? { ...prev, headers: newHeaders } : null);
-                              }}
-                              className="w-full bg-transparent border-none outline-none font-medium text-blue-900 placeholder-blue-700"
-                              placeholder={`Column ${index + 1}`}
-                            />
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    
-                    {/* Data Rows */}
-                    <tbody>
-                      {parsedData.rows.slice(0, 10).map((row, rowIndex) => (
-                        <tr key={rowIndex} className="border-b border-gray-100 hover:bg-gray-50">
-                          <td className="w-12 px-3 py-2 text-center text-xs text-gray-400 bg-gray-50">
-                            {rowIndex + 1}
-                          </td>
-                          {row.map((cell, cellIndex) => (
-                            <td key={cellIndex} className="px-3 py-2">
-                              <input
-                                type="text"
-                                value={cell || ''}
-                                onChange={(e) => {
-                                  const newRows = [...parsedData.rows];
-                                  newRows[rowIndex][cellIndex] = e.target.value;
-                                  setParsedData(prev => prev ? { ...prev, rows: newRows } : null);
-                                }}
-                                className="w-full bg-transparent border-none outline-none text-sm focus:bg-white focus:ring-1 focus:ring-blue-500 rounded px-1 py-1"
-                                placeholder="-"
-                              />
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                
-                {/* Footer info */}
-                <div className="bg-gray-50 px-4 py-3 border-t flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    Showing first 10 of {parsedData.rows.length} total rows
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Click any cell to edit • Headers are editable
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -598,37 +438,39 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
                     <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
                   )}
                 </div>
-                <span className={uploadState.isProcessing ? "text-gray-500" : "text-gray-700"}>
-                  Processing results to CSV...
+                <span className="text-gray-700">
+                  {uploadState.isProcessing ? "Waiting for processing..." : "Processing documents..."}
                 </span>
               </div>
             </div>
           )}
 
-          {/* Error Display */}
+          {/* Upload Error */}
           {uploadState.error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <p className="text-sm font-medium text-red-800">Upload Failed</p>
+            <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+              <div className="flex items-center space-x-3">
+                <AlertCircle className="h-5 w-5 text-red-500" />
+                <div>
+                  <p className="font-medium text-red-900">Upload Failed</p>
+                  <p className="text-sm text-red-700">{uploadState.error}</p>
+                </div>
               </div>
-              <p className="text-sm text-red-700 mt-1">{uploadState.error}</p>
             </div>
           )}
-        </div>
 
-        {/* Footer */}
-        <div className="flex justify-end space-x-3 pt-4 border-t">
-          <Button variant="outline" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button
-            onClick={showSpreadsheetPreview ? handleProceedToFieldMapping : handleUpload}
-            disabled={!canUpload}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {getUploadButtonText()}
-          </Button>
+          {/* Upload Button */}
+          <div className="flex justify-end space-x-3">
+            <Button variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpload}
+              disabled={!canUpload}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {uploadState.isUploading ? "Uploading..." : "Upload Document"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
 
@@ -638,12 +480,9 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center space-x-2">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
-              <span>Possible Duplicate File</span>
+              <span>Potential Duplicate File</span>
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
-              <p>
-                A similar file may already exist in your uploaded documents:
-              </p>
               {duplicateDocument && (
                 <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
                   <div className="flex items-center space-x-2">
@@ -675,8 +514,6 @@ export function UploadModal({ isOpen, onClose, documentType, onOpenCSVWizard }: 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-
     </Dialog>
   );
 }
