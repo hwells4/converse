@@ -280,7 +280,7 @@ export function CSVUploadWizard({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden p-0">
+      <DialogContent className="max-w-7xl h-[90vh] overflow-hidden p-0">
         <DialogHeader className="sr-only">
           <DialogTitle>{getStepTitle()}</DialogTitle>
           <DialogDescription>CSV Upload Wizard</DialogDescription>
@@ -406,7 +406,7 @@ export function CSVUploadWizard({
                       Data Preview
                     </h3>
                     <span className="text-xs text-gray-600">
-                      Showing first 8 rows • Total: {dataRows.length - selectedHeaderRow - 1} rows
+                      Showing first 20 rows • Total: {dataRows.length - selectedHeaderRow - 1} rows
                     </span>
                   </div>
                 </div>
@@ -422,7 +422,7 @@ export function CSVUploadWizard({
                       </tr>
                     </thead>
                     <tbody>
-                      {dataRows.slice(selectedHeaderRow + 1, selectedHeaderRow + 9).map((row, rowIndex) => (
+                      {dataRows.slice(selectedHeaderRow + 1, selectedHeaderRow + 21).map((row, rowIndex) => (
                         <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                           {row.map((cell, cellIndex) => (
                             <td key={cellIndex} className="px-3 py-2 text-xs text-gray-900 border-r max-w-[120px] truncate">
@@ -439,7 +439,7 @@ export function CSVUploadWizard({
           )}
 
           {currentStep === 'mapping' && (
-            <div className="p-6 space-y-4">
+            <div className="p-4 flex-1 flex flex-col space-y-3">
               {/* Quick mapping suggestions - compressed */}
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div className="flex items-center justify-between">
@@ -490,7 +490,7 @@ export function CSVUploadWizard({
                           <div>Status</div>
                         </div>
                       </div>
-                      <ScrollArea className="h-[500px]">
+                      <ScrollArea className="h-[300px]">
                         <div className="space-y-0">
                           {headers.map((header, index) => (
                             <div key={index} className="px-6 py-4 border-b border-gray-100 hover:bg-gray-50">
@@ -556,7 +556,7 @@ export function CSVUploadWizard({
           )}
 
           {currentStep === 'edit' && (
-            <div className="p-6 space-y-4">
+            <div className="p-4 flex-1 flex flex-col space-y-3">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
@@ -572,7 +572,7 @@ export function CSVUploadWizard({
                 </CardHeader>
                 <CardContent>
                   <div className="border rounded-lg overflow-hidden">
-                    <ScrollArea className="h-[500px]">
+                    <ScrollArea className="h-[300px]">
                       <table className="w-full">
                         <thead className="bg-gray-50 sticky top-0">
                           <tr>
