@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,12 +40,18 @@ export function CommissionStatementConfirmation({
     return mappedTransactions.reduce((total, transaction) => {
       const commissionField = Object.keys(transaction).find(key => 
         key.toLowerCase().includes('commission') && 
+        key.toLowerCase().includes('amount') &&
         transaction[key] && 
-        !isNaN(parseFloat(transaction[key]))
+        transaction[key] !== ''
       );
       
       if (commissionField) {
-        const amount = parseFloat(transaction[commissionField]);
+        // Clean the value - remove $ signs, commas, etc.
+        const cleanValue = String(transaction[commissionField])
+          .replace(/[$,\s]/g, '')
+          .replace(/[()]/g, '-'); // Handle negative values in parentheses
+        
+        const amount = parseFloat(cleanValue);
         return total + (isNaN(amount) ? 0 : amount);
       }
       return total;
@@ -54,11 +60,20 @@ export function CommissionStatementConfirmation({
 
   const [statementData, setStatementData] = useState<CommissionStatement>({
     carrierId,
-    carrierName: carrier?.name || "",
-    statementAmount: calculateStatementAmount(),
+    carrierName: "",
+    statementAmount: 0,
     statementNotes: "",
     statementDate: new Date().toISOString().split('T')[0] // Today's date in YYYY-MM-DD format
   });
+
+  // Update statement data when carrier or transactions change
+  useEffect(() => {
+    setStatementData(prev => ({
+      ...prev,
+      carrierName: carrier?.name || "",
+      statementAmount: calculateStatementAmount()
+    }));
+  }, [carrier, mappedTransactions]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -144,17 +159,12 @@ export function CommissionStatementConfirmation({
             {/* Carrier (Read-only) */}
             <div className="space-y-2">
               <Label htmlFor="carrier">Carrier</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="carrier"
-                  value={`${carrier?.name || 'Loading...'}`}
-                  disabled
-                  className="bg-gray-50"
-                />
-                <Badge variant="outline" className="text-xs">
-                  ID: {carrierId}
-                </Badge>
-              </div>
+              <Input
+                id="carrier"
+                value={carrier?.name || 'Loading...'}
+                disabled
+                className="bg-gray-50 font-medium"
+              />
             </div>
 
             {/* Statement Amount */}

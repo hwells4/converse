@@ -32,10 +32,10 @@ interface FieldMapping {
 
 // Salesforce fields for commission statements
 const SALESFORCE_FIELDS = [
-  { value: "policy_number", label: "Policy Number" },
+  { value: "policy_number", label: "Policy Number", required: true },
+  { value: "commission_amount", label: "Commission Amount", required: true },
   { value: "insured_name", label: "Insured Name" },
   { value: "agent_name", label: "Agent Name" },
-  { value: "commission_amount", label: "Commission Amount" },
   { value: "premium_amount", label: "Premium Amount" },
   { value: "effective_date", label: "Effective Date" },
   { value: "expiration_date", label: "Expiration Date" },
@@ -49,6 +49,9 @@ const SALESFORCE_FIELDS = [
   { value: "customer_id", label: "Customer ID" },
   { value: "skip", label: "Skip This Column" }
 ];
+
+// Required fields that must be mapped
+const REQUIRED_FIELDS = ["policy_number", "commission_amount"];
 
 export function CSVUploadWizard({ 
   isOpen, 
@@ -311,6 +314,15 @@ export function CSVUploadWizard({
 
   const getMappedFieldsCount = () => {
     return Object.values(fieldMapping).filter(field => field !== 'skip').length;
+  };
+
+  const getRequiredFieldsStatus = () => {
+    const mappedFields = Object.values(fieldMapping);
+    const missingRequired = REQUIRED_FIELDS.filter(required => !mappedFields.includes(required));
+    return {
+      allRequiredMapped: missingRequired.length === 0,
+      missingFields: missingRequired
+    };
   };
 
   const getStepTitle = () => {
@@ -683,10 +695,25 @@ export function CSVUploadWizard({
         {/* Footer */}
         <div className="bg-gray-50 border-t border-gray-200 px-8 py-4">
           <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-600">
-              {currentStep === 'preview' && `${dataRows.length} rows detected`}
-              {currentStep === 'mapping' && `${getMappedFieldsCount()} fields mapped`}
-              {currentStep === 'edit' && `${editableData.length} rows ready`}
+            <div className="text-sm">
+              {currentStep === 'preview' && (
+                <span className="text-gray-600">{dataRows.length} rows detected</span>
+              )}
+              {currentStep === 'mapping' && (
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600">{getMappedFieldsCount()} fields mapped</span>
+                  {!getRequiredFieldsStatus().allRequiredMapped && (
+                    <span className="text-red-600 text-xs bg-red-50 px-2 py-1 rounded">
+                      Missing required: {getRequiredFieldsStatus().missingFields.map(field => 
+                        SALESFORCE_FIELDS.find(f => f.value === field)?.label
+                      ).join(', ')}
+                    </span>
+                  )}
+                </div>
+              )}
+              {currentStep === 'edit' && (
+                <span className="text-gray-600">{editableData.length} rows ready</span>
+              )}
             </div>
             
             <div className="flex space-x-3">
@@ -704,7 +731,7 @@ export function CSVUploadWizard({
               {currentStep !== 'edit' ? (
                 <Button 
                   onClick={handleNext}
-                  disabled={currentStep === 'mapping' && getMappedFieldsCount() === 0}
+                  disabled={currentStep === 'mapping' && !getRequiredFieldsStatus().allRequiredMapped}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   Next
