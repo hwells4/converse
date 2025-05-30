@@ -24,21 +24,76 @@ interface FieldMapping {
 
 // Common Salesforce fields for commission statements
 const SALESFORCE_FIELDS = [
-  { value: "policy_number", label: "Policy Number" },
-  { value: "insured_name", label: "Insured Name" },
-  { value: "agent_name", label: "Agent Name" },
-  { value: "commission_amount", label: "Commission Amount" },
-  { value: "premium_amount", label: "Premium Amount" },
-  { value: "effective_date", label: "Effective Date" },
-  { value: "expiration_date", label: "Expiration Date" },
-  { value: "line_of_business", label: "Line of Business" },
-  { value: "carrier_name", label: "Carrier Name" },
-  { value: "producer_code", label: "Producer Code" },
+  { value: "admin_fee", label: "Admin Fee" },
   { value: "commission_rate", label: "Commission Rate" },
+  { value: "commission_transaction_name", label: "Commission Transaction Name" },
+  { value: "commissionable_premium", label: "Commissionable Premium" },
+  { value: "created_by_id", label: "Created By ID" },
+  { value: "created_date", label: "Created Date" },
+  { value: "crystal_cannon_5_percent", label: "Crystal Cannon 5%" },
+  { value: "deleted", label: "Deleted" },
+  { value: "difference_eff_trans_dates", label: "Difference Eff/Trans Dates" },
+  { value: "house_payable", label: "House Payable" },
+  { value: "house_payable_affiliate", label: "House Payable Affiliate" },
+  { value: "last_activity_date", label: "Last Activity Date" },
+  { value: "last_modified_by_id", label: "Last Modified By ID" },
+  { value: "last_modified_date", label: "Last Modified Date" },
+  { value: "last_referenced_date", label: "Last Referenced Date" },
+  { value: "last_viewed_date", label: "Last Viewed Date" },
+  { value: "mvr_charge", label: "MVR Charge" },
+  { value: "mvr_fee", label: "MVR Fee" },
+  { value: "mvr_share_percent", label: "MVR Share %" },
+  { value: "migration_commission_statement_id", label: "Migration Commission Statement Id" },
+  { value: "migration_id", label: "Migration Id" },
+  { value: "migration_policy_id", label: "Migration Policy Id" },
+  { value: "name_of_insured", label: "Name of Insured" },
+  { value: "new_opportunity_term", label: "New Opportunity Term" },
+  { value: "notes", label: "Notes" },
+  { value: "old_policy_identifier", label: "Old Policy Identifier" },
+  { value: "old_transaction_number", label: "Old Transaction Number" },
+  { value: "policy", label: "Policy" },
+  { value: "policy_effective_date", label: "Policy Effective Date" },
+  { value: "policy_expiration_date", label: "Policy Expiration Date" },
+  { value: "policy_name", label: "Policy Name" },
+  { value: "policy_number", label: "Policy Number" },
+  { value: "policy_number_from_import", label: "Policy Number from Import" },
+  { value: "policy_period", label: "Policy Period" },
+  { value: "policy_premium", label: "Policy Premium" },
+  { value: "policy_type", label: "Policy Type" },
+  { value: "prior_opportunity_term", label: "Prior Opportunity Term" },
+  { value: "producer_1", label: "Producer 1" },
+  { value: "producer_1_old", label: "Producer 1 Old" },
+  { value: "producer_1_override", label: "Producer 1 Override" },
+  { value: "producer_1_pay", label: "Producer 1 Pay" },
+  { value: "producer_1_pay_percent", label: "Producer 1 Pay Percent" },
+  { value: "producer_1_payable", label: "Producer 1 Payable" },
+  { value: "producer_1_payable_type", label: "Producer 1 Payable Type" },
+  { value: "producer_2", label: "Producer 2" },
+  { value: "producer_2_old", label: "Producer 2 Old" },
+  { value: "producer_2_override", label: "Producer 2 Override" },
+  { value: "producer_2_pay_percent", label: "Producer 2 Pay Percent" },
+  { value: "producer_2_pay_percent_old", label: "Producer 2 Pay Percent OLD" },
+  { value: "producer_2_payable", label: "Producer 2 Payable" },
+  { value: "producer_2_payable_old", label: "Producer 2 Payable OLD" },
+  { value: "producer_3", label: "Producer 3" },
+  { value: "producer_3_override", label: "Producer 3 Override" },
+  { value: "producer_3_pay_percent", label: "Producer 3 Pay Percent" },
+  { value: "producer_3_payable", label: "Producer 3 Payable" },
+  { value: "producer_4", label: "Producer 4" },
+  { value: "producer_4_override", label: "Producer 4 Override" },
+  { value: "producer_4_pay_percent", label: "Producer 4 Pay Percent" },
+  { value: "producer_4_payable", label: "Producer 4 Payable" },
+  { value: "record_id", label: "Record ID" },
+  { value: "statement_approval_date", label: "Statement Approval Date" },
+  { value: "statement_date", label: "Statement Date" },
+  { value: "system_modstamp", label: "System Modstamp" },
+  { value: "transaction_amount", label: "Transaction Amount" },
+  { value: "commission_amount", label: "Commission Amount" },
+  { value: "transaction_created_year_month", label: "Transaction Created Year & Month" },
   { value: "transaction_type", label: "Transaction Type" },
-  { value: "payment_date", label: "Payment Date" },
-  { value: "agency_name", label: "Agency Name" },
-  { value: "customer_id", label: "Customer ID" },
+  { value: "transaction_effective_date", label: "Transaction/Effective Date" },
+  { value: "unique_id", label: "Unique ID" },
+  { value: "update_field", label: "Update Field" },
 ];
 
 export function SpreadsheetFieldMapping({ 
@@ -177,25 +232,18 @@ export function SpreadsheetFieldMapping({
                           )}
                         </div>
                         
-                        <Select 
-                          value={fieldMapping[index] || ""} 
-                          onValueChange={(value) => handleMappingChange(index, value)}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select Salesforce field..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="">No mapping</SelectItem>
-                            {SALESFORCE_FIELDS.filter(field => 
+                        <SearchableSelect
+                          options={[
+                            { value: "", label: "No mapping" },
+                            ...SALESFORCE_FIELDS.filter(field => 
                               !getUsedSalesforceFields().includes(field.value) || 
                               fieldMapping[index] === field.value
-                            ).map((field) => (
-                              <SelectItem key={field.value} value={field.value}>
-                                {field.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                            )
+                          ]}
+                          value={fieldMapping[index] || ""}
+                          onValueChange={(value) => handleMappingChange(index, value)}
+                          placeholder="Select Salesforce field..."
+                        />
 
                         {/* Sample data preview */}
                         <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
