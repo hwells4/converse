@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVUploadWizard } from "./csv-upload-wizard";
-import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink, ChevronDown, CheckCircle } from "lucide-react";
+import { FailedTransactionsReview } from "./failed-transactions-review";
+import { FileText, Download, Eye, ArrowRight, Trash2, ExternalLink, ChevronDown, CheckCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -25,14 +26,50 @@ export function RecentDocuments() {
     documentId: number;
   } | null>(null);
 
+  const [failedTransactionsData, setFailedTransactionsData] = useState<{
+    isOpen: boolean;
+    failedTransactions: any[];
+    document: any;
+  } | null>(null);
+
   const handleOpenCSVWizard = async (document: any) => {
     try {
       console.log("Opening CSV wizard for document:", document);
       
       // Fetch the actual CSV data from the backend
       const response = await fetch(`/api/documents/${document.id}/csv-data`);
+      
+      console.log("🔵 CSV fetch response status:", response.status);
+      console.log("🔵 CSV fetch response headers:", Object.fromEntries(response.headers.entries()));
+      
       if (!response.ok) {
-        throw new Error(`Failed to fetch CSV data: ${response.status} ${response.statusText}`);
+        // Try to get error message from response, but handle cases where response body is empty
+        let errorMessage = `Failed to fetch CSV data: ${response.status} ${response.statusText}`;
+        let responseText = '';
+        
+        try {
+          responseText = await response.text();
+          console.log("🔵 Error response body:", responseText);
+          
+          if (responseText) {
+            const errorData = JSON.parse(responseText);
+            if (errorData && errorData.message) {
+              errorMessage = errorData.message;
+              
+              // Special handling for Railway/Doctly processing issues
+              if (errorMessage.includes("The specified key does not exist")) {
+                errorMessage = "The document appears to have been processed, but the CSV file is missing from storage. This is likely a processing service issue. Please try re-uploading the document or contact support.";
+              }
+            }
+          }
+        } catch (jsonError) {
+          // Response body is not JSON or is empty - use the default error message
+          console.warn("Could not parse error response as JSON:", jsonError);
+          console.warn("Raw response text:", responseText);
+        }
+        
+        console.error("🔴 Final error message:", errorMessage);
+        throw new Error(errorMessage);
       }
       
       const csvData = await response.json();
@@ -58,11 +95,24 @@ export function RecentDocuments() {
       console.error("Error opening CSV wizard:", error);
       toast({
         title: "Error",
-        description: "Failed to load document data for review",
+        description: error instanceof Error ? error.message : "Failed to load document data for review",
         variant: "destructive",
       });
     }
   };
+
+  const handleOpenFailedTransactions = (document: any) => {
+    const metadata = document.metadata;
+    const completionData = metadata?.completionData;
+    const failedTransactions = completionData?.failedTransactions || [];
+    
+    setFailedTransactionsData({
+      isOpen: true,
+      failedTransactions,
+      document
+    });
+  };
+
   const [deletingDocumentId, setDeletingDocumentId] = useState<number | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean;
@@ -106,6 +156,27 @@ export function RecentDocuments() {
               variant: "default",
             });
           }
+          // Notification for corrections processed
+          else if (currentDoc.status === 'completed_with_errors') {
+            const completionData = (currentDoc.metadata as any)?.completionData;
+            const correctionHistory = completionData?.correctionHistory;
+            
+            // Check if there's a new correction attempt
+            if (correctionHistory && correctionHistory.length > 0) {
+              const latestCorrection = correctionHistory[correctionHistory.length - 1];
+              const previousDoc = previousDocuments.current.find(doc => doc.id === currentDoc.id);
+              const previousHistory = (previousDoc?.metadata as any)?.completionData?.correctionHistory || [];
+              
+              // If we have a new correction entry, show notification
+              if (correctionHistory.length > previousHistory.length) {
+                toast({
+                  title: "Correction Update",
+                  description: `${latestCorrection.successful} of ${latestCorrection.attempted} corrections successful. ${completionData.numberOfSuccessful}/${completionData.totalTransactions} total completed.`,
+                  variant: "default",
+                });
+              }
+            }
+          }
         }
       });
     }
@@ -142,18 +213,39 @@ export function RecentDocuments() {
             Completed
           </Badge>
         );
+      case "completed_with_errors":
+        return (
+          <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+            <div className="w-2 h-2 bg-orange-500 rounded-full mr-1"></div>
+            Partial Success
+          </Badge>
+        );
       case "processing":
         return (
           <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-            <div className="w-2 h-2 bg-yellow-500 rounded-full mr-1 animate-pulse"></div>
+            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             Processing
           </Badge>
         );
       case "uploading":
         return (
           <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-            <div className="w-2 h-2 bg-yellow-500 rounded-full mr-1 animate-pulse"></div>
+            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             Uploading
+          </Badge>
+        );
+      case "salesforce_upload_pending":
+        return (
+          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
+            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            Uploading to Salesforce
+          </Badge>
+        );
+      case "correction_pending":
+        return (
+          <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            Processing Corrections
           </Badge>
         );
       case "failed":
@@ -164,12 +256,7 @@ export function RecentDocuments() {
           </Badge>
         );
       default:
-        return (
-          <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">
-            <div className="w-2 h-2 bg-gray-500 rounded-full mr-1"></div>
-            Uploaded
-          </Badge>
-        );
+        return null; // Remove the grey "uploaded" status entirely
     }
   };
 
@@ -261,11 +348,16 @@ export function RecentDocuments() {
     );
 
     // Actions based on document status - Show review for all processed documents
-    if (document.status === "processed" || document.status === "review_pending" || document.status === "uploaded_to_salesforce") {
+    if (document.status === "processed" || document.status === "review_pending" || document.status === "uploaded_to_salesforce" || document.status === "completed" || document.status === "completed_with_errors") {
       return (
         <div className="flex items-center space-x-1">
           {/* Primary Action Button */}
-          {document.status === "review_pending" ? (
+          {document.status === "processing" ? (
+            <div className="flex items-center space-x-2 text-yellow-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">Processing...</span>
+            </div>
+          ) : document.status === "review_pending" ? (
             <Button
               size="sm"
               onClick={() => {
@@ -277,6 +369,17 @@ export function RecentDocuments() {
             >
               <CheckCircle className="h-4 w-4 mr-1" />
               Review
+            </Button>
+          ) : document.status === "completed_with_errors" ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                handleOpenFailedTransactions(document);
+              }}
+              className="bg-orange-600 hover:bg-orange-700 text-white h-8 px-3"
+            >
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Review Errors
             </Button>
           ) : (
             <Button
@@ -299,6 +402,17 @@ export function RecentDocuments() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {document.status === "completed_with_errors" && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    handleOpenFailedTransactions(document);
+                  }}
+                  className="cursor-pointer text-orange-600 hover:text-orange-700"
+                >
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Review Failed Transactions
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() => {
                   handleOpenCSVWizard(document);
@@ -332,10 +446,16 @@ export function RecentDocuments() {
     // For processing, failed, or uploaded documents
     return (
       <div className="flex items-center space-x-1">
-        <span className="text-gray-400 text-sm">
-          {document.status === "processing" ? "Processing..." : 
-           document.status === "failed" ? "Processing failed" : "Not available"}
-        </span>
+        {document.status === "processing" ? (
+          <div className="flex items-center space-x-2 text-yellow-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Processing...</span>
+          </div>
+        ) : (
+          <span className="text-gray-400 text-sm">
+            {document.status === "failed" ? "Processing failed" : "Not available"}
+          </span>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-8 w-8 p-0">
@@ -356,6 +476,21 @@ export function RecentDocuments() {
       </div>
     );
   };
+
+  if (failedTransactionsData?.isOpen) {
+    return (
+      <FailedTransactionsReview
+        isOpen={failedTransactionsData.isOpen}
+        onClose={() => setFailedTransactionsData(null)}
+        failedTransactions={failedTransactionsData.failedTransactions}
+        document={failedTransactionsData.document}
+        onResubmit={(correctedTransactions) => {
+          console.log("Corrected transactions:", correctedTransactions);
+          // TODO: Implement resubmission to Salesforce
+        }}
+      />
+    );
+  }
 
   if (csvWizardData?.isOpen) {
     return (

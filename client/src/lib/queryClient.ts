@@ -29,7 +29,8 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
+    const url = queryKey[0] as string;
+    const res = await fetch(url, {
       credentials: "include",
     });
 
@@ -38,7 +39,22 @@ export const getQueryFn: <T>(options: {
     }
 
     await throwIfResNotOk(res);
-    return await res.json();
+    
+    // Get response text first so we can debug if needed
+    const text = await res.text();
+    
+    try {
+      return JSON.parse(text);
+    } catch (error) {
+      console.error('🚨 JSON PARSING ERROR:');
+      console.error('URL:', url);
+      console.error('Status:', res.status);
+      console.error('Headers:', Object.fromEntries(res.headers.entries()));
+      console.error('Response body:', text);
+      console.error('Original error:', error);
+      
+      throw error;
+    }
   };
 
 export const queryClient = new QueryClient({

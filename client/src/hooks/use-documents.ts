@@ -6,6 +6,8 @@ export function useDocuments() {
   return useQuery<Document[]>({
     queryKey: ["/api/documents"],
     refetchInterval: 5000, // Poll every 5 seconds to check for status updates
+    staleTime: 0, // Always fetch fresh data
+    retry: 3, // Retry failed requests
   });
 }
 

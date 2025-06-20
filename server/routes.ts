@@ -185,7 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new Error('API key not configured for PDF parser service');
       }
 
-      const response = await fetch('https://pdfparser-production-f216.up.railway.app/parse', {
+      const response = await fetch('https://pdfparser-production-f216.up.railway.app/parse-json', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -227,6 +227,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('🧪 Headers:', JSON.stringify(req.headers, null, 2));
     console.log('🧪 Body:', JSON.stringify(req.body, null, 2));
     res.json({ success: true, message: "Test webhook received successfully", timestamp: new Date().toISOString() });
+  });
+
+  // Simple test to verify correction webhook route exists
+  app.get("/api/webhook/n8n-correction-completion", async (req, res) => {
+    res.json({ 
+      message: "N8N correction completion webhook endpoint exists", 
+      method: "POST expected",
+      timestamp: new Date().toISOString()
+    });
   });
 
   // PDF Parser webhook endpoint
@@ -761,12 +770,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/webhook/n8n-completion", async (req, res) => {
     console.log('🔵 Received N8N completion webhook');
     console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
+    console.log('🔵 Request headers:', req.headers);
     
     try {
       // Handle both array and single object formats
       let payloadArray: any[];
       
-      if (Array.isArray(req.body)) {
+      // Check if the webhook has a 'results' array (new format)
+      if (req.body && req.body.results && Array.isArray(req.body.results)) {
+        console.log('🔍 [DEBUG] Detected webhook with results array format');
+        payloadArray = req.body.results;
+      } else if (Array.isArray(req.body)) {
         // Validate as array
         const validatedArray = n8nCompletionWebhookArraySchema.parse(req.body);
         payloadArray = validatedArray;
@@ -777,19 +791,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log(`📊 Processing ${payloadArray.length} completion notification(s)`);
+      console.log('🔍 [DEBUG] Raw payloadArray:', JSON.stringify(payloadArray, null, 2));
       
       const results = [];
       
       for (const payload of payloadArray) {
         try {
-          console.log('✅ N8N completion webhook payload validation passed for document:', payload.document.id);
+          // Extract document from payload - handle both direct document and results format
+          const document = payload.document || payload;
+          console.log('✅ N8N completion webhook payload validation passed for document:', document.id);
           
-          const documentId = payload.document.id;
-          const completionData = payload.document.metadata.completionData;
+          const documentId = document.id;
+          const completionData = document.metadata.completionData;
           
-          // Update document status to completed with metadata
+          // Debug logging for failed transactions detection
+          console.log('🔍 [DEBUG] Completion data received:');
+          console.log('🔍 [DEBUG] failedTransactions:', JSON.stringify(completionData.failedTransactions, null, 2));
+          console.log('🔍 [DEBUG] failedTransactions length:', completionData.failedTransactions?.length);
+          console.log('🔍 [DEBUG] numberOfSuccessful:', completionData.numberOfSuccessful);
+          console.log('🔍 [DEBUG] totalTransactions:', completionData.totalTransactions);
+          console.log('🔍 [DEBUG] message:', completionData.message);
+          
+          // Determine final status based on failed transactions
+          const hasFailedTransactions = completionData.failedTransactions && completionData.failedTransactions.length > 0;
+          const finalStatus = hasFailedTransactions ? "completed_with_errors" : "completed";
+          
+          console.log('🔍 [DEBUG] hasFailedTransactions:', hasFailedTransactions);
+          console.log('🔍 [DEBUG] finalStatus will be set to:', finalStatus);
+          
+          // Update document status to completed or completed_with_errors based on failures
+          console.log('🔍 [DEBUG] About to update document with status:', finalStatus);
+          console.log('🔍 [DEBUG] Update payload:', {
+            status: finalStatus,
+            metadata: {
+              completionData: {
+                carrierName: completionData.carrierName,
+                numberOfSuccessful: completionData.numberOfSuccessful,
+                totalTransactions: completionData.totalTransactions,
+                failedTransactions: completionData.failedTransactions || [],
+                message: completionData.message,
+                completedAt: completionData.completedAt
+              }
+            }
+          });
+          
           const updatedDocument = await storage.updateDocument(documentId, {
-            status: "completed",
+            status: finalStatus,
             metadata: {
               completionData: {
                 carrierName: completionData.carrierName,
@@ -812,17 +859,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             continue;
           }
 
-          console.log(`✅ Document ${documentId} marked as completed`);
+          console.log(`✅ Document ${documentId} marked as ${finalStatus}`);
           console.log(`📊 Upload results: ${completionData.numberOfSuccessful}/${completionData.totalTransactions} successful`);
           
           if (completionData.failedTransactions && completionData.failedTransactions.length > 0) {
             console.log(`⚠️ ${completionData.failedTransactions.length} transactions failed`);
+            console.log(`🔍 Failed transactions:`, completionData.failedTransactions);
           }
 
           results.push({
             documentId,
             success: true,
-            message: "Document status updated to completed",
+            message: `Document status updated to ${finalStatus}`,
             document: updatedDocument
           });
           
@@ -1267,6 +1315,401 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: error instanceof Error ? error.message : "Unknown error"
       });
     }
+  });
+
+  // Endpoint for resubmitting failed transactions to N8N
+  app.post("/api/documents/:id/resubmit-failed-transactions", async (req, res) => {
+    console.log('🔵 Received failed transactions resubmission request');
+    console.log('🔵 Document ID:', req.params.id);
+    console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
+    
+    try {
+      const documentId = parseInt(req.params.id);
+      if (isNaN(documentId)) {
+        return res.status(400).json({ message: "Invalid document ID" });
+      }
+      
+      const { correctedTransactions } = req.body;
+      
+      if (!correctedTransactions || !Array.isArray(correctedTransactions)) {
+        return res.status(400).json({ message: "Invalid corrected transactions data" });
+      }
+      
+      // Get document details
+      const document = await storage.getDocument(documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      // N8N webhook URLs for commission correction
+      const N8N_CORRECTION_TEST_URL = "https://hwells4.app.n8n.cloud/webhook-test/commission-correction";
+      const N8N_CORRECTION_PROD_URL = "https://hwells4.app.n8n.cloud/webhook/commission-correction";
+      
+      // Configuration for easy switching between test and production
+      // Set COMMISSION_CORRECTION_WEBHOOK_URL environment variable to override, or change USE_PRODUCTION_CORRECTION below
+      const USE_PRODUCTION_CORRECTION = false; // Change this to true for production
+      const TEST_MODE = false; // Change this to true to skip N8N webhook calls for testing
+      
+      const correctionWebhookUrl = process.env.COMMISSION_CORRECTION_WEBHOOK_URL || (USE_PRODUCTION_CORRECTION ? N8N_CORRECTION_PROD_URL : N8N_CORRECTION_TEST_URL);
+      
+      console.log(`🔗 Using N8N correction webhook: ${USE_PRODUCTION_CORRECTION ? 'PRODUCTION' : 'TEST'} - ${correctionWebhookUrl}`);
+      console.log(`🧪 Test mode: ${TEST_MODE ? 'ENABLED (skipping webhook)' : 'DISABLED'}`);
+      console.log(`🚀 Resubmitting ${correctedTransactions.length} corrected transactions for document ${documentId}`);
+      
+      // Use the same webhook URL pattern as your working system - get current domain
+      const currentHost = req.get('host');
+      const protocol = req.get('host')?.includes('replit.dev') ? 'https' : req.protocol;
+      const webhookBaseUrl = process.env.WEBHOOK_BASE_URL || `${protocol}://${currentHost}`;
+      const completionWebhookUrl = `${webhookBaseUrl}/api/webhook/n8n-correction-completion`;
+      
+      console.log('🔗 Correction webhook URL (no document ID in URL):', completionWebhookUrl);
+      console.log('💡 Document ID will be included in the request body instead');
+      
+      const correctionPayload = {
+        transactions: correctedTransactions.map(transaction => ({
+          statementId: transaction.commissionStatementId || transaction.originalData["Commission Statement"],
+          policyNumber: transaction.originalData["Policy Number"] || transaction.policyNumber,
+          insuredName: transaction.originalData["Name of Insured"] || null,
+          transactionAmount: transaction.originalData["Transaction Amount"] || transaction.transactionAmount
+        })),
+        webhookUrl: completionWebhookUrl, // Tell n8n where to send the completion response
+        documentId: documentId // Include document ID in payload - N8N will include this in the webhook body
+      };
+      
+      console.log('📤 Correction payload:', JSON.stringify(correctionPayload, null, 2));
+      
+      if (TEST_MODE) {
+        console.log('🧪 TEST MODE: Skipping N8N correction webhook call');
+        console.log('📋 Payload that would be sent:', JSON.stringify(correctionPayload, null, 2));
+        
+        res.json({
+          success: true,
+          message: `TEST MODE: ${correctedTransactions.length} transaction(s) would be resubmitted`,
+          resubmittedCount: correctedTransactions.length,
+          documentId,
+          testMode: true
+        });
+      } else {
+        console.log('🚀 Sending corrected transactions to N8N webhook...');
+        console.log('🔗 Webhook URL:', correctionWebhookUrl);
+        console.log('📤 Payload being sent to N8N:', JSON.stringify(correctionPayload, null, 2));
+        
+        const n8nResponse = await fetch(correctionWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(correctionPayload)
+        });
+        
+        console.log('📡 N8N Response Status:', n8nResponse.status);
+        console.log('📡 N8N Response Headers:', [...n8nResponse.headers.entries()]);
+        
+        if (!n8nResponse.ok) {
+          console.error('❌ N8N correction webhook call failed:', n8nResponse.status, n8nResponse.statusText);
+          
+          // Try to get response text for debugging
+          let errorText = '';
+          try {
+            errorText = await n8nResponse.text();
+            console.error('❌ N8N response body:', errorText);
+          } catch (e) {
+            console.error('❌ Could not read N8N response body');
+          }
+          
+          return res.status(500).json({ 
+            success: false,
+            message: "Failed to send corrected transactions to N8N webhook",
+            error: `${n8nResponse.status} ${n8nResponse.statusText}`,
+            responseBody: errorText.substring(0, 500)
+          });
+        }
+        
+        const n8nResult = await n8nResponse.text();
+        console.log('✅ N8N correction webhook response:', n8nResult);
+        console.log('✅ N8N response status:', n8nResponse.status);
+        
+        // N8N will send results via HTTP Request node to the webhook URL
+        res.json({
+          success: true,
+          message: `${correctedTransactions.length} transaction(s) have been sent for correction. Results will be processed via webhook.`,
+          resubmittedCount: correctedTransactions.length,
+          documentId,
+          webhookUrl: completionWebhookUrl
+        });
+      }
+      
+    } catch (error) {
+      console.error('❌ Error during failed transactions resubmission:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to resubmit transactions",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // N8N correction completion webhook endpoint
+  app.post("/api/webhook/n8n-correction-completion", async (req, res) => {
+    console.log('🔵 ========== CORRECTION WEBHOOK RECEIVED ==========');
+    console.log('🔵 Timestamp:', new Date().toISOString());
+    console.log('🔵 URL hit:', req.url);
+    console.log('🔵 Method:', req.method);
+    console.log('🔵 Request body:', JSON.stringify(req.body, null, 2));
+    console.log('🔵 Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('🔵 ====================================');
+    
+    try {
+      // Get document ID from request body (same pattern as your working webhook)
+      const documentId = req.body.documentId || req.body.document?.id;
+      
+      if (!documentId) {
+        console.error('❌ No documentId provided in webhook body');
+        return res.status(400).json({ 
+          success: false,
+          message: "Document ID required in request body" 
+        });
+      }
+      
+      console.log(`📄 Processing correction results for document ${documentId}`);
+      
+      // Handle the correction webhook format: { totalProcessed, successCount, failureCount, results: { successful: [...], failed: [...] }, documentId }
+      const { totalProcessed, successCount, failureCount, results, summary } = req.body;
+      
+      if (!results || (!results.successful && !results.failed)) {
+        console.error('❌ Invalid correction results structure');
+        return res.status(400).json({ 
+          success: false,
+          message: "Invalid correction results structure - missing successful/failed arrays" 
+        });
+      }
+      
+      console.log('📊 Correction Summary:');
+      console.log(`   Total Processed: ${totalProcessed}`);
+      console.log(`   Successful: ${successCount}`);
+      console.log(`   Failed: ${failureCount}`);
+      console.log(`   Summary: ${summary}`);
+      
+      // Get current document state from our database
+      const currentDocument = await storage.getDocument(documentId);
+      if (!currentDocument) {
+        return res.status(404).json({ 
+          success: false,
+          message: "Document not found" 
+        });
+      }
+      
+      const currentMetadata = currentDocument.metadata as any;
+      const currentCompletionData = currentMetadata?.completionData || {};
+      
+      console.log('🔍 Current completion data:', JSON.stringify(currentCompletionData, null, 2));
+      
+      // Update cumulative success/failure counts
+      const previousSuccessful = currentCompletionData.numberOfSuccessful || 0;
+      const newSuccessfulCount = previousSuccessful + successCount;
+      const totalTransactions = currentCompletionData.totalTransactions || 0;
+      
+      console.log(`📊 Progress update: ${previousSuccessful} + ${successCount} = ${newSuccessfulCount}/${totalTransactions}`);
+      
+      // Remove successfully corrected transactions from failed list
+      const updatedFailedTransactions = (currentCompletionData.failedTransactions || []).filter((failedTx: any) => {
+        const wasSuccessful = (results.successful || []).some((successfulResult: any) => {
+          const txPolicyNumber = successfulResult.policyNumber;
+          const failedPolicyNumber = failedTx.policyNumber || failedTx.originalData?.["Policy Number"];
+          return txPolicyNumber === failedPolicyNumber;
+        });
+        return !wasSuccessful;
+      });
+      
+      // Add any new failures from this correction attempt
+      const newFailedTransactions = (results.failed || []).map((failedResult: any) => ({
+        type: "policy_not_found",
+        error: failedResult.error,
+        insuredName: failedResult.originalData?.insuredName,
+        statementId: failedResult.originalData?.statementId,
+        originalData: {
+          "Policy Name": null,
+          "Policy Number": failedResult.originalData?.policyNumber || failedResult.policyNumber,
+          "Name of Insured": failedResult.originalData?.insuredName,
+          "Transaction Type": null,
+          "Transaction Amount": failedResult.originalData?.transactionAmount || failedResult.amount,
+          "Commission Statement": failedResult.originalData?.statementId
+        },
+        policyNumber: failedResult.originalData?.policyNumber || failedResult.policyNumber,
+        transactionAmount: failedResult.originalData?.transactionAmount || failedResult.amount,
+        commissionStatementId: failedResult.originalData?.statementId
+      }));
+      
+      // Combine existing failed transactions with new failures
+      const allFailedTransactions = [...updatedFailedTransactions, ...newFailedTransactions];
+      
+      // Determine final status
+      const allTransactionsSuccessful = newSuccessfulCount === totalTransactions && allFailedTransactions.length === 0;
+      const finalStatus = allTransactionsSuccessful ? "completed" : "completed_with_errors";
+      
+      // Update completion data
+      const updatedCompletionData = {
+        ...currentCompletionData,
+        numberOfSuccessful: newSuccessfulCount,
+        failedTransactions: allFailedTransactions,
+        message: allTransactionsSuccessful 
+          ? `All ${totalTransactions} transactions completed successfully` 
+          : `${newSuccessfulCount} of ${totalTransactions} transactions completed. ${allFailedTransactions.length} still have issues.`,
+        lastCorrectionAt: new Date().toISOString(),
+        correctionHistory: [
+          ...(currentCompletionData.correctionHistory || []),
+          {
+            timestamp: new Date().toISOString(),
+            attempted: totalProcessed,
+            successful: successCount,
+            failed: failureCount,
+            summary: summary || `Processed ${totalProcessed} corrections`
+          }
+        ]
+      };
+      
+      console.log('🔄 UPDATING DATABASE...');
+      console.log('📝 Document ID:', documentId);
+      console.log('📝 New Status:', finalStatus);
+      console.log('📝 Updated failed transactions count:', updatedFailedTransactions.length);
+      console.log('📝 Total successful:', newSuccessfulCount);
+      
+      const updatedDocument = await storage.updateDocument(documentId, {
+        status: finalStatus,
+        metadata: {
+          completionData: updatedCompletionData
+        }
+      });
+      
+      console.log('✅ DATABASE UPDATE COMPLETE!');
+      console.log(`📊 Document ${documentId} status is now: ${finalStatus}`);
+      console.log(`📊 Total successful: ${newSuccessfulCount}/${totalTransactions}`);
+      console.log(`⚠️ Remaining failed: ${allFailedTransactions.length}`);
+      console.log('🔄 Frontend should see this update within 5 seconds due to polling...');
+      
+      res.json({
+        success: true,
+        message: "Correction results processed successfully",
+        document: {
+          id: documentId,
+          status: finalStatus,
+          totalSuccessful: newSuccessfulCount,
+          totalTransactions: totalTransactions,
+          remainingFailed: allFailedTransactions.length,
+          isFullyComplete: finalStatus === "completed"
+        }
+      });
+      
+    } catch (error) {
+      console.error('❌ Error processing correction completion webhook:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to process correction completion",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  // Helper function to process N8N correction results (used by both direct response and webhook)
+  async function processN8NCorrectionResults(documentId: number, correctionData: any) {
+    const { totalProcessed, successCount, failureCount, results, summary } = correctionData;
+    
+    console.log('🔄 UPDATING DATABASE...');
+    console.log('📝 Document ID:', documentId);
+    console.log('📝 Success count:', successCount);
+    console.log('📝 Failure count:', failureCount);
+    
+    // Get current document state
+    const document = await storage.getDocument(documentId);
+    if (!document) {
+      throw new Error("Document not found");
+    }
+    
+    const currentMetadata = document.metadata as any;
+    const currentCompletionData = currentMetadata?.completionData || {};
+    
+    // Update cumulative success/failure counts
+    const newSuccessfulCount = (currentCompletionData.numberOfSuccessful || 0) + successCount;
+    const totalTransactions = currentCompletionData.totalTransactions || 0;
+    
+    // Remove successfully corrected transactions from failed list
+    const updatedFailedTransactions = (currentCompletionData.failedTransactions || []).filter((failedTx: any) => {
+      const wasSuccessful = results.successful?.some((successfulResult: any) => {
+        const txPolicyNumber = successfulResult.transaction?.policyNumber;
+        const failedPolicyNumber = failedTx.policyNumber || failedTx.originalData?.["Policy Number"];
+        return txPolicyNumber === failedPolicyNumber;
+      });
+      return !wasSuccessful;
+    });
+    
+    // Add any new failures from this correction attempt
+    const newFailedTransactions = (results.failed || []).map((failedResult: any) => ({
+      type: "policy_not_found",
+      error: failedResult.message || failedResult.error,
+      insuredName: failedResult.originalData?.insuredName,
+      statementId: failedResult.originalData?.statementId,
+      originalData: {
+        "Policy Name": null,
+        "Policy Number": failedResult.originalData?.policyNumber,
+        "Name of Insured": failedResult.originalData?.insuredName,
+        "Transaction Type": null,
+        "Transaction Amount": failedResult.originalData?.transactionAmount,
+        "Commission Statement": failedResult.originalData?.statementId
+      },
+      policyNumber: failedResult.originalData?.policyNumber,
+      transactionAmount: failedResult.originalData?.transactionAmount,
+      commissionStatementId: failedResult.originalData?.statementId
+    }));
+    
+    const allFailedTransactions = [...updatedFailedTransactions, ...newFailedTransactions];
+    const allTransactionsSuccessful = newSuccessfulCount === totalTransactions && allFailedTransactions.length === 0;
+    const finalStatus = allTransactionsSuccessful ? "completed" : "completed_with_errors";
+    
+    console.log('📝 New Status:', finalStatus);
+    console.log('📝 Updated failed transactions count:', allFailedTransactions.length);
+    
+    const updatedCompletionData = {
+      ...currentCompletionData,
+      numberOfSuccessful: newSuccessfulCount,
+      failedTransactions: allFailedTransactions,
+      message: allTransactionsSuccessful 
+        ? `All ${totalTransactions} transactions completed successfully` 
+        : `${newSuccessfulCount} of ${totalTransactions} transactions completed. ${allFailedTransactions.length} still have issues.`,
+      lastCorrectionAt: new Date().toISOString(),
+      correctionHistory: [
+        ...(currentCompletionData.correctionHistory || []),
+        {
+          timestamp: new Date().toISOString(),
+          attempted: totalProcessed,
+          successful: successCount,
+          failed: failureCount,
+          summary
+        }
+      ]
+    };
+    
+    await storage.updateDocument(documentId, {
+      status: finalStatus,
+      metadata: {
+        completionData: updatedCompletionData
+      }
+    });
+    
+    console.log('✅ DATABASE UPDATE COMPLETE!');
+    console.log(`📊 Document ${documentId} status is now: ${finalStatus}`);
+    console.log(`📊 Total successful: ${newSuccessfulCount}/${totalTransactions}`);
+    console.log(`⚠️ Remaining failed: ${allFailedTransactions.length}`);
+    console.log('🔄 Frontend should see this update within 5 seconds due to polling...');
+    
+    return { finalStatus, newSuccessfulCount, totalTransactions, allFailedTransactions };
+  }
+
+  // Debug route to catch any webhook attempts
+  app.all("/api/webhook/*", (req, res, next) => {
+    console.log(`🔍 WEBHOOK DEBUG: ${req.method} ${req.url}`);
+    console.log(`🔍 Headers:`, req.headers);
+    console.log(`🔍 Body:`, req.body);
+    next(); // Continue to actual route handler
   });
 
   const httpServer = createServer(app);

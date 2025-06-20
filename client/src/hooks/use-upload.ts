@@ -149,6 +149,9 @@ export function useUpload() {
         // For PDF files, trigger PDF parsing service
         setUploadState(prev => ({ ...prev, isProcessing: true }));
         
+        console.log('🔄 [Upload Hook] Starting PDF processing for document:', document.id);
+        const processingStartTime = Date.now();
+        
         try {
           await AWSService.triggerPDFParser({ 
             s3Key, 
@@ -156,6 +159,9 @@ export function useUpload() {
             carrierId,
             documentId: document.id
           });
+          
+          const processingTime = Date.now() - processingStartTime;
+          console.log('✅ [Upload Hook] PDF processing trigger completed in', processingTime, 'ms');
           
           await updateDocument.mutateAsync({
             id: document.id,

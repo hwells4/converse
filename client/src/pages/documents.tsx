@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVUploadWizard } from "@/components/csv-upload-wizard";
+import { FailedTransactionsReview } from "@/components/failed-transactions-review";
 import { ToastNotifications } from "@/components/toast-notifications";
-import { FileText, Download, Eye, ArrowLeft, Search, Filter, Shield, Trash2, ChevronDown, CheckCircle } from "lucide-react";
+import { FileText, Download, Eye, ArrowLeft, Search, Filter, Shield, Trash2, ChevronDown, CheckCircle, AlertTriangle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +26,12 @@ export default function Documents() {
     carrierId: number;
   } | null>(null);
 
+  const [failedTransactionsData, setFailedTransactionsData] = useState<{
+    isOpen: boolean;
+    failedTransactions: any[];
+    document: any;
+  } | null>(null);
+
   const handleOpenCSVWizard = async (document: any) => {
     try {
       console.log("Opening CSV wizard for document:", document);
@@ -32,7 +39,18 @@ export default function Documents() {
       // Fetch the actual CSV data from the backend
       const response = await fetch(`/api/documents/${document.id}/csv-data`);
       if (!response.ok) {
-        throw new Error(`Failed to fetch CSV data: ${response.status} ${response.statusText}`);
+        // Try to get error message from response, but handle cases where response body is empty
+        let errorMessage = `Failed to fetch CSV data: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (jsonError) {
+          // Response body is not JSON or is empty - use the default error message
+          console.warn("Could not parse error response as JSON:", jsonError);
+        }
+        throw new Error(errorMessage);
       }
       
       const csvData = await response.json();
@@ -57,11 +75,24 @@ export default function Documents() {
       console.error("Error opening CSV wizard:", error);
       toast({
         title: "Error",
-        description: "Failed to load document data for review",
+        description: error instanceof Error ? error.message : "Failed to load document data for review",
         variant: "destructive",
       });
     }
   };
+
+  const handleOpenFailedTransactions = (document: any) => {
+    const metadata = document.metadata;
+    const completionData = metadata?.completionData;
+    const failedTransactions = completionData?.failedTransactions || [];
+    
+    setFailedTransactionsData({
+      isOpen: true,
+      failedTransactions,
+      document
+    });
+  };
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -97,6 +128,13 @@ export default function Documents() {
           <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
             <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
             Completed
+          </Badge>
+        );
+      case "completed_with_errors":
+        return (
+          <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+            <div className="w-2 h-2 bg-orange-500 rounded-full mr-1"></div>
+            Partial Success
           </Badge>
         );
       case "processing":
@@ -278,6 +316,7 @@ export default function Documents() {
                   <SelectItem value="review_pending">Review Pending</SelectItem>
                   <SelectItem value="processed">Processed</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="completed_with_errors">Partial Success</SelectItem>
                   <SelectItem value="failed">Failed</SelectItem>
                 </SelectContent>
               </Select>
@@ -387,7 +426,7 @@ export default function Documents() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {/* Actions based on document status - Show review for all processed documents */}
-                        {(document.status === "processed" || document.status === "review_pending" || document.status === "uploaded_to_salesforce") ? (
+                        {(document.status === "processed" || document.status === "review_pending" || document.status === "uploaded_to_salesforce" || document.status === "completed" || document.status === "completed_with_errors") ? (
                           <div className="flex items-center space-x-1">
                             {/* Primary Action Button */}
                             {document.status === "review_pending" ? (
@@ -401,6 +440,17 @@ export default function Documents() {
                               >
                                 <CheckCircle className="h-4 w-4 mr-1" />
                                 Review
+                              </Button>
+                            ) : document.status === "completed_with_errors" ? (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  handleOpenFailedTransactions(document);
+                                }}
+                                className="bg-orange-600 hover:bg-orange-700 text-white h-8 px-3"
+                              >
+                                <AlertTriangle className="h-4 w-4 mr-1" />
+                                Review Errors
                               </Button>
                             ) : (
                               <Button
@@ -423,6 +473,17 @@ export default function Documents() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                {document.status === "completed_with_errors" && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      handleOpenFailedTransactions(document);
+                                    }}
+                                    className="cursor-pointer text-orange-600 hover:text-orange-700"
+                                  >
+                                    <AlertTriangle className="h-4 w-4 mr-2" />
+                                    Review Failed Transactions
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem
                                   onClick={() => {
                                     console.log("CSV Preview dropdown clicked for document:", document.id);
@@ -546,6 +607,20 @@ export default function Documents() {
           onComplete={(finalData) => {
             console.log("CSV wizard completed:", finalData);
             setCsvWizardData(null);
+          }}
+        />
+      )}
+
+      {/* Failed Transactions Review */}
+      {failedTransactionsData?.isOpen && (
+        <FailedTransactionsReview
+          isOpen={failedTransactionsData.isOpen}
+          onClose={() => setFailedTransactionsData(null)}
+          failedTransactions={failedTransactionsData.failedTransactions}
+          document={failedTransactionsData.document}
+          onResubmit={(correctedTransactions) => {
+            console.log("Corrected transactions:", correctedTransactions);
+            setFailedTransactionsData(null);
           }}
         />
       )}

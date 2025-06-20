@@ -176,14 +176,20 @@ export function CSVUploadWizard({
           
           if (cacheAge < fiveMinutes) {
             const cachedData = localStorage.getItem(cacheKey);
-            if (cachedData) {
-              const parsed = JSON.parse(cachedData);
-              if (parsed.editableData && parsed.fieldMapping) {
-                setEditableData(parsed.editableData);
-                setFieldMapping(parsed.fieldMapping);
-                if (parsed.currentStep) {
-                  setCurrentStep(parsed.currentStep);
+            if (cachedData && cachedData !== 'undefined' && cachedData !== 'null') {
+              try {
+                const parsed = JSON.parse(cachedData);
+                if (parsed.editableData && parsed.fieldMapping) {
+                  setEditableData(parsed.editableData);
+                  setFieldMapping(parsed.fieldMapping);
+                  if (parsed.currentStep) {
+                    setCurrentStep(parsed.currentStep);
+                  }
                 }
+              } catch (parseError) {
+                console.warn('Failed to parse cached data, clearing cache:', parseError);
+                localStorage.removeItem(cacheKey);
+                localStorage.removeItem(cacheTimestampKey);
               }
             }
           } else {
@@ -194,6 +200,9 @@ export function CSVUploadWizard({
         }
       } catch (error) {
         console.error('Error loading cached data:', error);
+        // Clear potentially corrupted cache
+        localStorage.removeItem(cacheKey);
+        localStorage.removeItem(cacheTimestampKey);
       }
     };
 

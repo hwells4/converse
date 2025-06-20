@@ -165,9 +165,10 @@ export class AWSService {
    */
   static async triggerPDFParser({ s3Key, documentType, carrierId, documentId }: PDFParserParams): Promise<void> {
     try {
-      console.log('🚀 Starting PDF parser invocation...');
-      console.log('📋 PDF parser params:', { s3Key, documentType, carrierId, documentId });
-      console.log('🔗 PDF parser API URL:', `${this.apiBaseUrl}/api/pdf-parser/trigger`);
+      const startTime = Date.now();
+      console.log('🚀 [Frontend] Starting PDF parser invocation at', new Date().toISOString());
+      console.log('📋 [Frontend] PDF parser params:', { s3Key, documentType, carrierId, documentId });
+      console.log('🔗 [Frontend] PDF parser API URL:', `${this.apiBaseUrl}/api/pdf-parser/trigger`);
 
       const requestBody = {
         s3Key,
@@ -175,8 +176,10 @@ export class AWSService {
         carrierId,
         documentId,
       };
-      console.log('📤 PDF parser request body:', requestBody);
+      console.log('📤 [Frontend] PDF parser request body:', requestBody);
 
+      console.log('⏱️ [Frontend] About to call backend API...');
+      const fetchStartTime = Date.now();
       const response = await fetch(`${this.apiBaseUrl}/api/pdf-parser/trigger`, {
         method: 'POST',
         headers: {
@@ -185,8 +188,10 @@ export class AWSService {
         body: JSON.stringify(requestBody),
       });
 
-      console.log('📥 PDF parser response status:', response.status);
-      console.log('📥 PDF parser response headers:', Object.fromEntries(response.headers.entries()));
+      const fetchEndTime = Date.now();
+      console.log('📥 [Frontend] Backend response received in', fetchEndTime - fetchStartTime, 'ms');
+      console.log('📊 [Frontend] Response status:', response.status);
+      console.log('📋 [Frontend] Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -200,7 +205,8 @@ export class AWSService {
         throw new Error(error.message || 'Failed to start PDF parsing');
       }
 
-      console.log('✅ PDF parser invocation successful');
+      const totalTime = Date.now() - startTime;
+      console.log('✅ [Frontend] PDF parser invocation successful in', totalTime, 'ms total');
     } catch (error) {
       console.error("💥 PDF parser invocation failed with error:", error);
       console.error("💥 Error stack:", error instanceof Error ? error.stack : 'No stack trace');
@@ -224,8 +230,18 @@ export class AWSService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to generate download URL');
+        // Try to get error message from response, but handle cases where response body is empty
+        let errorMessage = `Failed to generate download URL: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (jsonError) {
+          // Response body is not JSON or is empty - use the default error message
+          console.warn("Could not parse error response as JSON:", jsonError);
+        }
+        throw new Error(errorMessage);
       }
 
       const { downloadUrl } = await response.json();
@@ -240,25 +256,6 @@ export class AWSService {
     } catch (error) {
       console.error("Failed to download CSV:", error);
       throw new Error(`Failed to download CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  /**
-   * Download processed JSON via backend endpoint (for document ID)
-   */
-  static async downloadProcessedJSON(documentId: number): Promise<any> {
-    try {
-      const response = await fetch(`${this.apiBaseUrl}/api/documents/${documentId}/processed-json`);
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to fetch processed data');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error("Failed to download JSON:", error);
-      throw new Error(`Failed to fetch processed data: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
