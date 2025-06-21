@@ -1403,7 +1403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         console.log('📡 N8N Response Status:', n8nResponse.status);
-        console.log('📡 N8N Response Headers:', [...n8nResponse.headers.entries()]);
+        console.log('📡 N8N Response Headers:', Object.fromEntries(n8nResponse.headers.entries()));
         
         if (!n8nResponse.ok) {
           console.error('❌ N8N correction webhook call failed:', n8nResponse.status, n8nResponse.statusText);
@@ -1460,8 +1460,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('🔵 ====================================');
     
     try {
+      // Handle array format from N8N
+      let correctionData;
+      if (Array.isArray(req.body) && req.body.length > 0) {
+        console.log('🔍 Detected array format from N8N, extracting first element');
+        correctionData = req.body[0];
+      } else {
+        correctionData = req.body;
+      }
+      
       // Get document ID from request body (same pattern as your working webhook)
-      const documentId = req.body.documentId || req.body.document?.id;
+      const documentId = correctionData.documentId || correctionData.document?.id;
       
       if (!documentId) {
         console.error('❌ No documentId provided in webhook body');
@@ -1474,7 +1483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`📄 Processing correction results for document ${documentId}`);
       
       // Handle the correction webhook format: { totalProcessed, successCount, failureCount, results: { successful: [...], failed: [...] }, documentId }
-      const { totalProcessed, successCount, failureCount, results, summary } = req.body;
+      const { totalProcessed, successCount, failureCount, results, summary } = correctionData;
       
       if (!results || (!results.successful && !results.failed)) {
         console.error('❌ Invalid correction results structure');
@@ -1504,24 +1513,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('🔍 Current completion data:', JSON.stringify(currentCompletionData, null, 2));
       
-      // Update cumulative success/failure counts
-      const previousSuccessful = currentCompletionData.numberOfSuccessful || 0;
-      const newSuccessfulCount = previousSuccessful + successCount;
+      // Calculate success count based on remaining failed transactions (avoid double-counting)
       const totalTransactions = currentCompletionData.totalTransactions || 0;
       
-      console.log(`📊 Progress update: ${previousSuccessful} + ${successCount} = ${newSuccessfulCount}/${totalTransactions}`);
+      console.log(`📊 Correction update: ${successCount} successful, ${failureCount} failed from this batch`);
       
-      // Remove successfully corrected transactions from failed list
-      const updatedFailedTransactions = (currentCompletionData.failedTransactions || []).filter((failedTx: any) => {
-        const wasSuccessful = (results.successful || []).some((successfulResult: any) => {
-          const txPolicyNumber = successfulResult.policyNumber;
-          const failedPolicyNumber = failedTx.policyNumber || failedTx.originalData?.["Policy Number"];
-          return txPolicyNumber === failedPolicyNumber;
-        });
-        return !wasSuccessful;
+      // Get the policy numbers that were submitted for correction
+      const submittedPolicyNumbers = new Set();
+      (results.successful || []).forEach((success: any) => {
+        submittedPolicyNumbers.add(success.policyNumber);
+      });
+      (results.failed || []).forEach((failed: any) => {
+        submittedPolicyNumbers.add(failed.originalData?.policyNumber || failed.policyNumber);
       });
       
-      // Add any new failures from this correction attempt
+      console.log('🔍 Policy numbers submitted for correction:', Array.from(submittedPolicyNumbers));
+      
+      // Remove ALL transactions that were submitted (both successful and failed attempts)
+      const remainingFailedTransactions = (currentCompletionData.failedTransactions || []).filter((failedTx: any) => {
+        const txPolicyNumber = failedTx.policyNumber || failedTx.originalData?.["Policy Number"];
+        const wasSubmitted = submittedPolicyNumbers.has(txPolicyNumber);
+        console.log(`🔍 Policy ${txPolicyNumber}: was submitted = ${wasSubmitted}`);
+        return !wasSubmitted; // Keep only transactions that were NOT submitted for correction
+      });
+      
+      // Add back only the transactions that failed in this correction attempt
       const newFailedTransactions = (results.failed || []).map((failedResult: any) => ({
         type: "policy_not_found",
         error: failedResult.error,
@@ -1540,8 +1556,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         commissionStatementId: failedResult.originalData?.statementId
       }));
       
-      // Combine existing failed transactions with new failures
-      const allFailedTransactions = [...updatedFailedTransactions, ...newFailedTransactions];
+      // Combine untouched failed transactions with new failures
+      const allFailedTransactions = [...remainingFailedTransactions, ...newFailedTransactions];
+      
+      // Calculate successful count correctly: total - remaining failed
+      const newSuccessfulCount = totalTransactions - allFailedTransactions.length;
+      
+      // Validate the math makes sense
+      if (newSuccessfulCount < 0) {
+        console.error(`❌ Invalid calculation: successful count cannot be negative (${newSuccessfulCount})`);
+        return res.status(500).json({
+          success: false,
+          message: "Data integrity error: invalid transaction counts"
+        });
+      }
+      
+      if (newSuccessfulCount + allFailedTransactions.length !== totalTransactions) {
+        console.error(`❌ Math validation failed: ${newSuccessfulCount} + ${allFailedTransactions.length} ≠ ${totalTransactions}`);
+        return res.status(500).json({
+          success: false,
+          message: "Data integrity error: transaction counts don't add up"
+        });
+      }
+      
+      console.log('📊 Failed transactions breakdown:');
+      console.log(`   Previous failed count: ${currentCompletionData.failedTransactions?.length || 0}`);
+      console.log(`   Submitted for correction: ${submittedPolicyNumbers.size}`);
+      console.log(`   Remaining untouched: ${remainingFailedTransactions.length}`);
+      console.log(`   New failures from correction: ${newFailedTransactions.length}`);
+      console.log(`   Final failed count: ${allFailedTransactions.length}`);
+      console.log(`   Calculated successful count: ${totalTransactions} - ${allFailedTransactions.length} = ${newSuccessfulCount}`);
+      console.log(`✅ Math validation passed: ${newSuccessfulCount} + ${allFailedTransactions.length} = ${totalTransactions}`);
       
       // Determine final status
       const allTransactionsSuccessful = newSuccessfulCount === totalTransactions && allFailedTransactions.length === 0;
@@ -1571,7 +1616,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('🔄 UPDATING DATABASE...');
       console.log('📝 Document ID:', documentId);
       console.log('📝 New Status:', finalStatus);
-      console.log('📝 Updated failed transactions count:', updatedFailedTransactions.length);
+      console.log('📝 Updated failed transactions count:', allFailedTransactions.length);
       console.log('📝 Total successful:', newSuccessfulCount);
       
       const updatedDocument = await storage.updateDocument(documentId, {
@@ -1610,99 +1655,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper function to process N8N correction results (used by both direct response and webhook)
-  async function processN8NCorrectionResults(documentId: number, correctionData: any) {
-    const { totalProcessed, successCount, failureCount, results, summary } = correctionData;
-    
-    console.log('🔄 UPDATING DATABASE...');
-    console.log('📝 Document ID:', documentId);
-    console.log('📝 Success count:', successCount);
-    console.log('📝 Failure count:', failureCount);
-    
-    // Get current document state
-    const document = await storage.getDocument(documentId);
-    if (!document) {
-      throw new Error("Document not found");
-    }
-    
-    const currentMetadata = document.metadata as any;
-    const currentCompletionData = currentMetadata?.completionData || {};
-    
-    // Update cumulative success/failure counts
-    const newSuccessfulCount = (currentCompletionData.numberOfSuccessful || 0) + successCount;
-    const totalTransactions = currentCompletionData.totalTransactions || 0;
-    
-    // Remove successfully corrected transactions from failed list
-    const updatedFailedTransactions = (currentCompletionData.failedTransactions || []).filter((failedTx: any) => {
-      const wasSuccessful = results.successful?.some((successfulResult: any) => {
-        const txPolicyNumber = successfulResult.transaction?.policyNumber;
-        const failedPolicyNumber = failedTx.policyNumber || failedTx.originalData?.["Policy Number"];
-        return txPolicyNumber === failedPolicyNumber;
-      });
-      return !wasSuccessful;
-    });
-    
-    // Add any new failures from this correction attempt
-    const newFailedTransactions = (results.failed || []).map((failedResult: any) => ({
-      type: "policy_not_found",
-      error: failedResult.message || failedResult.error,
-      insuredName: failedResult.originalData?.insuredName,
-      statementId: failedResult.originalData?.statementId,
-      originalData: {
-        "Policy Name": null,
-        "Policy Number": failedResult.originalData?.policyNumber,
-        "Name of Insured": failedResult.originalData?.insuredName,
-        "Transaction Type": null,
-        "Transaction Amount": failedResult.originalData?.transactionAmount,
-        "Commission Statement": failedResult.originalData?.statementId
-      },
-      policyNumber: failedResult.originalData?.policyNumber,
-      transactionAmount: failedResult.originalData?.transactionAmount,
-      commissionStatementId: failedResult.originalData?.statementId
-    }));
-    
-    const allFailedTransactions = [...updatedFailedTransactions, ...newFailedTransactions];
-    const allTransactionsSuccessful = newSuccessfulCount === totalTransactions && allFailedTransactions.length === 0;
-    const finalStatus = allTransactionsSuccessful ? "completed" : "completed_with_errors";
-    
-    console.log('📝 New Status:', finalStatus);
-    console.log('📝 Updated failed transactions count:', allFailedTransactions.length);
-    
-    const updatedCompletionData = {
-      ...currentCompletionData,
-      numberOfSuccessful: newSuccessfulCount,
-      failedTransactions: allFailedTransactions,
-      message: allTransactionsSuccessful 
-        ? `All ${totalTransactions} transactions completed successfully` 
-        : `${newSuccessfulCount} of ${totalTransactions} transactions completed. ${allFailedTransactions.length} still have issues.`,
-      lastCorrectionAt: new Date().toISOString(),
-      correctionHistory: [
-        ...(currentCompletionData.correctionHistory || []),
-        {
-          timestamp: new Date().toISOString(),
-          attempted: totalProcessed,
-          successful: successCount,
-          failed: failureCount,
-          summary
-        }
-      ]
-    };
-    
-    await storage.updateDocument(documentId, {
-      status: finalStatus,
-      metadata: {
-        completionData: updatedCompletionData
-      }
-    });
-    
-    console.log('✅ DATABASE UPDATE COMPLETE!');
-    console.log(`📊 Document ${documentId} status is now: ${finalStatus}`);
-    console.log(`📊 Total successful: ${newSuccessfulCount}/${totalTransactions}`);
-    console.log(`⚠️ Remaining failed: ${allFailedTransactions.length}`);
-    console.log('🔄 Frontend should see this update within 5 seconds due to polling...');
-    
-    return { finalStatus, newSuccessfulCount, totalTransactions, allFailedTransactions };
-  }
 
   // Debug route to catch any webhook attempts
   app.all("/api/webhook/*", (req, res, next) => {
