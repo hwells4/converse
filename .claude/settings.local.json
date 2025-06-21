@@ -6,7 +6,14 @@
       "Bash(rg:*)",
       "Bash(node:*)",
       "Bash(curl:*)",
-      "Bash(npm run check:*)"
+      "Bash(npm run check:*)",
+      "Bash(mkdir:*)",
+      "Bash(npx tsc:*)",
+      "Bash(timeout 5 npm run dev:*)",
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(ls:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": []
   }

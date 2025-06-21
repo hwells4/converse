@@ -30,8 +30,18 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const url = queryKey[0] as string;
-    const res = await fetch(url, {
+    // Add timestamp to prevent caching
+    const urlWithTimestamp = url.includes('?') 
+      ? `${url}&_t=${Date.now()}` 
+      : `${url}?_t=${Date.now()}`;
+    
+    const res = await fetch(urlWithTimestamp, {
       credentials: "include",
+      cache: "no-store", // Force no caching
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
@@ -61,11 +71,12 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
-      refetchInterval: false,
+      // Don't set refetchInterval or staleTime here - let individual queries control their own behavior
       refetchOnWindowFocus: false,
-      staleTime: 1 * 60 * 1000, // 1 minute - very short cache
       gcTime: 2 * 60 * 1000, // 2 minutes garbage collection
       retry: false,
+      // Force network requests
+      networkMode: 'always',
     },
     mutations: {
       retry: false,

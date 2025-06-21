@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Check, MapPin, Table, ArrowRight } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface SpreadsheetFieldMappingProps {
   isOpen: boolean;
@@ -246,7 +247,7 @@ export function SpreadsheetFieldMapping({
                             )
                           ]}
                           value={fieldMapping[index] || ""}
-                          onValueChange={(value) => handleMappingChange(index, value)}
+                          onValueChange={(value: string) => handleMappingChange(index, value)}
                           placeholder="Select Salesforce field..."
                         />
 

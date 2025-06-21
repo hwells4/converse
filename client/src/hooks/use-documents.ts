@@ -1,13 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Document, InsertDocument, UpdateDocument } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import { useCallback } from "react";
 
 export function useDocuments() {
   return useQuery<Document[]>({
     queryKey: ["/api/documents"],
     refetchInterval: 5000, // Poll every 5 seconds to check for status updates
     staleTime: 0, // Always fetch fresh data
+    gcTime: 0, // Don't cache at all
     retry: 3, // Retry failed requests
+    refetchIntervalInBackground: true, // Keep polling even when tab is not focused
   });
 }
 
@@ -110,4 +113,22 @@ export function useDocumentsByStatus(status: string) {
     queryKey: ["/api/documents/status", status],
     enabled: !!status,
   });
+}
+
+// Manual refresh function for force-updating documents
+export function useForceRefreshDocuments() {
+  const queryClient = useQueryClient();
+  
+  return useCallback(async () => {
+    console.log("🔄 Force refreshing documents...");
+    // Invalidate and refetch immediately
+    await queryClient.invalidateQueries({ 
+      queryKey: ["/api/documents"],
+      exact: true 
+    });
+    await queryClient.refetchQueries({ 
+      queryKey: ["/api/documents"],
+      exact: true 
+    });
+  }, [queryClient]);
 }

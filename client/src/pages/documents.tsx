@@ -10,6 +10,7 @@ import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVUploadWizard } from "@/components/csv-upload-wizard";
 import { FailedTransactionsReview } from "@/components/failed-transactions-review";
 import { ToastNotifications } from "@/components/toast-notifications";
+import { DocumentStatusDebugger } from "@/components/document-status-debugger";
 import { FileText, Download, Eye, ArrowLeft, Search, Filter, Shield, Trash2, ChevronDown, CheckCircle, AlertTriangle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -626,6 +627,12 @@ export default function Documents() {
       )}
       
       <ToastNotifications />
+      
+      {/* Status Debugger - Show in development or with ?debug=true */}
+      {(process.env.NODE_ENV === 'development' || 
+        new URLSearchParams(window.location.search).get('debug') === 'true') && (
+        <DocumentStatusDebugger />
+      )}
     </div>
   );
 }
