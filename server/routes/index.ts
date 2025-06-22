@@ -11,6 +11,7 @@ import { pdfProcessingRoutes } from "./processing/pdf";
 import { csvProcessingRoutes } from "./processing/csv";
 import { pdfParserWebhookRoutes } from "./webhooks/pdf-parser";
 import { documentWebhookRoutes } from "./webhooks/document";
+// import { n8nWebhookRoutes } from "./webhooks/n8n"; // DISABLED - using unified
 import { n8nUnifiedWebhookRoutes } from "./webhooks/n8n-unified";
 import { n8nIntegrationRoutes } from "./integrations/n8n";
 import { debugRoutes } from "./debug/test";
@@ -26,6 +27,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", csvProcessingRoutes);
   app.use("/api", pdfParserWebhookRoutes);
   app.use("/api", documentWebhookRoutes);
+  // app.use("/api", n8nWebhookRoutes); // DISABLED - using unified
   app.use("/api", n8nUnifiedWebhookRoutes);
   app.use("/api", n8nIntegrationRoutes);
   app.use("/api", debugRoutes);
