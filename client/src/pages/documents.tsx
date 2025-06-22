@@ -5,14 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge, type DocumentStatus } from "@/components/ui/status-badge";
+import { ActionButton } from "@/components/ui/action-button";
+import { DocumentsPageTableSkeleton } from "@/components/ui/loading-skeleton";
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog";
 import { CSVUploadWizard } from "@/components/csv-upload-wizard";
 import { FailedTransactionsReview } from "@/components/failed-transactions-review";
 import { ToastNotifications } from "@/components/toast-notifications";
 import { DocumentStatusDebugger } from "@/components/document-status-debugger";
-import { FileText, Download, Eye, ArrowLeft, Search, Filter, Shield, Trash2, ChevronDown, CheckCircle, AlertTriangle } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { FileText, ArrowLeft, Search, Filter, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -108,71 +109,6 @@ export default function Documents() {
     documentName: "",
   });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "processed":
-        return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-            Processed
-          </Badge>
-        );
-      case "uploaded_to_salesforce":
-        return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-            Uploaded to Salesforce
-          </Badge>
-        );
-      case "completed":
-        return (
-          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-            Completed
-          </Badge>
-        );
-      case "completed_with_errors":
-        return (
-          <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">
-            <div className="w-2 h-2 bg-orange-500 rounded-full mr-1"></div>
-            Partial Success
-          </Badge>
-        );
-      case "processing":
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-            <div className="w-2 h-2 bg-yellow-500 rounded-full mr-1 animate-pulse"></div>
-            Processing
-          </Badge>
-        );
-      case "uploading":
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
-            <div className="w-2 h-2 bg-yellow-500 rounded-full mr-1 animate-pulse"></div>
-            Uploading
-          </Badge>
-        );
-      case "review_pending":
-        return (
-          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-            <div className="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
-            Review Pending
-          </Badge>
-        );
-      case "failed":
-        return (
-          <Badge className="bg-red-100 text-red-800 hover:bg-red-100">
-            Failed
-          </Badge>
-        );
-      default:
-        return (
-          <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">
-            Uploaded
-          </Badge>
-        );
-    }
-  };
 
   const getDocumentTypeBadge = (type: string) => {
     const isCommission = type === "commission";
@@ -345,242 +281,112 @@ export default function Documents() {
         )}
 
         {/* Documents Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Document
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Uploaded
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {isLoading ? (
-                  // Loading skeletons
-                  Array.from({ length: 8 }).map((_, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <Skeleton className="w-8 h-8 rounded-lg mr-3" />
-                          <div>
-                            <Skeleton className="h-4 w-40 mb-1" />
-                            <Skeleton className="h-3 w-20" />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Skeleton className="h-6 w-20 rounded-full" />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Skeleton className="h-6 w-24 rounded-full" />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Skeleton className="h-4 w-24" />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex space-x-3">
-                          <Skeleton className="h-8 w-20" />
-                          <Skeleton className="h-8 w-16" />
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : filteredDocuments.length > 0 ? (
-                  filteredDocuments.map((document) => (
-                    <tr key={document.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3">
-                            <FileText className="h-4 w-4 text-red-600" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {document.originalName}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {formatFileSize(document.fileSize)}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getDocumentTypeBadge(document.documentType)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {getStatusBadge(document.status)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {format(new Date(document.uploadedAt), "MMM dd, yyyy 'at' h:mm a")}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {/* Actions based on document status - Show review for all processed documents */}
-                        {(document.status === "processed" || document.status === "review_pending" || document.status === "uploaded_to_salesforce" || document.status === "completed" || document.status === "completed_with_errors") ? (
-                          <div className="flex items-center space-x-1">
-                            {/* Primary Action Button */}
-                            {document.status === "review_pending" ? (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  console.log("Review button clicked for document:", document.id, "status:", document.status);
-                                  handleOpenCSVWizard(document);
-                                }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
-                              >
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Review
-                              </Button>
-                            ) : document.status === "completed_with_errors" ? (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  handleOpenFailedTransactions(document);
-                                }}
-                                className="bg-orange-600 hover:bg-orange-700 text-white h-8 px-3"
-                              >
-                                <AlertTriangle className="h-4 w-4 mr-1" />
-                                Review Errors
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  handleOpenCSVWizard(document);
-                                }}
-                                className="bg-green-600 hover:bg-green-700 text-white h-8 px-3"
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                Preview
-                              </Button>
-                            )}
-                            
-                            {/* Dropdown Menu */}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                                  <ChevronDown className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {document.status === "completed_with_errors" && (
-                                  <DropdownMenuItem
-                                    onClick={() => {
-                                      handleOpenFailedTransactions(document);
-                                    }}
-                                    className="cursor-pointer text-orange-600 hover:text-orange-700"
-                                  >
-                                    <AlertTriangle className="h-4 w-4 mr-2" />
-                                    Review Failed Transactions
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    console.log("CSV Preview dropdown clicked for document:", document.id);
-                                    handleOpenCSVWizard(document);
-                                  }}
-                                  className="cursor-pointer"
-                                >
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View CSV Preview
-                                </DropdownMenuItem>
-                                {document.csvUrl && (
-                                  <DropdownMenuItem
-                                    onClick={() => handleDownloadCSV(document.csvUrl!, document.originalName)}
-                                    className="cursor-pointer"
-                                  >
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Download CSV
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteDocument(document.id, document.originalName)}
-                                  disabled={deletingDocumentId === document.id}
-                                  className="cursor-pointer text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  {deletingDocumentId === document.id ? "Deleting..." : "Delete"}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        ) : (
-                          <div className="flex items-center space-x-1">
-                            <span className="text-gray-400 text-sm">
-                              {document.status === "processing" ? "Processing..." : "Not available"}
-                            </span>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-8 w-8 p-0">
-                                  <ChevronDown className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteDocument(document.id, document.originalName)}
-                                  disabled={deletingDocumentId === document.id}
-                                  className="cursor-pointer text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  {deletingDocumentId === document.id ? "Deleting..." : "Delete"}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
+        {isLoading ? (
+          <DocumentsPageTableSkeleton />
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center">
-                      <div className="text-gray-500">
-                        <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-lg font-medium mb-2">
-                          {searchTerm || statusFilter !== "all" || typeFilter !== "all" 
-                            ? "No documents match your filters" 
-                            : "No documents yet"
-                          }
-                        </h3>
-                        <p className="text-sm">
-                          {searchTerm || statusFilter !== "all" || typeFilter !== "all"
-                            ? "Try adjusting your search or filters."
-                            : "Upload your first document to get started."
-                          }
-                        </p>
-                        {(searchTerm || statusFilter !== "all" || typeFilter !== "all") && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSearchTerm("");
-                              setStatusFilter("all");
-                              setTypeFilter("all");
-                            }}
-                            className="mt-4"
-                          >
-                            Clear Filters
-                          </Button>
-                        )}
-                      </div>
-                    </td>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Document
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Uploaded
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredDocuments.length > 0 ? (
+                    filteredDocuments.map((document) => (
+                      <tr key={document.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3">
+                              <FileText className="h-4 w-4 text-red-600" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {document.originalName}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {formatFileSize(document.fileSize)}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {getDocumentTypeBadge(document.documentType)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <StatusBadge status={document.status as DocumentStatus} showTooltip />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {format(new Date(document.uploadedAt), "MMM dd, yyyy 'at' h:mm a")}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <ActionButton
+                            status={document.status as DocumentStatus}
+                            onReview={() => handleOpenCSVWizard(document)}
+                            onPreview={() => handleOpenCSVWizard(document)}
+                            onReviewErrors={() => handleOpenFailedTransactions(document)}
+                            onDownload={document.csvUrl ? () => handleDownloadCSV(document.csvUrl!, document.originalName) : undefined}
+                            onDelete={() => handleDeleteDocument(document.id, document.originalName)}
+                            isDeleting={deletingDocumentId === document.id}
+                          />
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center">
+                        <div className="text-gray-500">
+                          <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                          <h3 className="text-lg font-medium mb-2">
+                            {searchTerm || statusFilter !== "all" || typeFilter !== "all" 
+                              ? "No documents match your filters" 
+                              : "No documents yet"
+                            }
+                          </h3>
+                          <p className="text-sm">
+                            {searchTerm || statusFilter !== "all" || typeFilter !== "all"
+                              ? "Try adjusting your search or filters."
+                              : "Upload your first document to get started."
+                            }
+                          </p>
+                          {(searchTerm || statusFilter !== "all" || typeFilter !== "all") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSearchTerm("");
+                                setStatusFilter("all");
+                                setTypeFilter("all");
+                              }}
+                              className="mt-4"
+                            >
+                              Clear Filters
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       <ConfirmationDialog
