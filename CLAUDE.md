@@ -13,6 +13,11 @@ npm run check        # Run TypeScript type checking
 npm run db:push      # Push database schema changes via Drizzle
 ```
 
+### Development Workflow
+- Always run `npm run check` before commits to ensure TypeScript compliance
+- Use `npm run db:push` after schema changes in `shared/schema.ts`
+- Test API endpoints via `/api/debug/*` routes during development
+
 ## Architecture Overview
 
 This is a full-stack TypeScript application for processing insurance commission statements and renewal reports.
@@ -119,10 +124,11 @@ This is a full-stack TypeScript application for processing insurance commission 
   - `POST /api/test-webhook` - Test webhook connectivity
 - **Document Processing** (`/server/routes/webhooks/document.ts`)
   - `POST /api/webhook/document-processed` - AWS Lambda callback
-- **N8N** (`/server/routes/webhooks/n8n.ts`)
-  - `POST /api/webhook/n8n-completion` - N8N completion callback
-- **Corrections** (`/server/routes/webhooks/corrections.ts`)
-  - `POST /api/webhook/n8n-correction-completion` - Correction results callback
+- **N8N Unified** (`/server/routes/webhooks/n8n-unified.ts`) **[ACTIVE]**
+  - `POST /api/webhook/n8n-completion` - N8N completion callback with standardized handling
+  - `POST /api/webhook/n8n-correction-completion` - N8N correction completion callback
+- **Legacy N8N** (`/server/routes/webhooks/n8n.ts`) **[DISABLED]**
+  - Replaced by unified webhook system
 
 #### N8N Integration (`/server/routes/integrations/n8n.ts`)
 - `POST /api/n8n/salesforce-upload` - Trigger Salesforce upload
@@ -165,3 +171,30 @@ Document statuses: uploaded → processing → processed → salesforce_upload_p
   - Reduced merge conflicts when multiple developers work on different features
   - Better code organization and separation of concerns
   - Gradual migration from legacy code patterns
+
+## Development Guidelines
+
+### Security Requirements
+- **CRITICAL**: AWS credentials MUST NEVER be exposed in client-side code or `VITE_` prefixed environment variables
+- All AWS operations (S3, Lambda) MUST be executed server-side only
+- Use presigned URLs for client-side S3 uploads
+- Validate all webhook requests with security tokens where possible
+
+### Code Organization Principles
+- **Database Schema**: All schema changes MUST be made in `shared/schema.ts` first using Drizzle + Zod
+- **API Validation**: All API endpoints MUST validate inputs using Zod schemas from `shared/schema.ts`
+- **UI Components**: Prioritize shadcn/ui components for consistency (`@/components/ui`)
+- **State Management**: Use TanStack Query for server state, React hooks for local UI state
+- **Error Handling**: Use toast notifications via `use-toast.ts` for user feedback
+
+### File Storage Architecture
+- **S3 Storage**: All user files (PDFs) and processed outputs (CSV/JSON) stored in AWS S3
+- **Database**: PostgreSQL stores only metadata and references (S3 keys/URLs), never binary data
+- **S3 Key Convention**: `uploads/<carrier_id>/<uuid>/<filename>` for uploads, `processed/<carrier_id>/<uuid>/` for outputs
+
+### Webhook System Architecture
+- **Standardized Handler**: All webhooks use `/server/utils/webhook-handler.ts` for consistent logging, validation, and error handling
+- **N8N Unified Webhooks**: Current system uses `n8n-unified.ts` with standardized payload handling and correction logic
+- **Webhook Response Format**: All webhooks return standardized `WebhookResponse` interface with `success`, `message`, `data`, and `error` fields
+- **Payload Validation**: Webhooks validate incoming payloads using Zod schemas with detailed error reporting
+- **Correction Processing**: Advanced logic to handle N8N correction callbacks with transaction count reconciliation
