@@ -242,6 +242,12 @@ router.post("/documents/:id/resubmit-failed-transactions", async (req, res) => {
     
     console.log('📤 Correction payload:', JSON.stringify(correctionPayload, null, 2));
     
+    // Update document status to correction_pending immediately when corrections are submitted
+    await storage.updateDocument(documentId, {
+      status: "correction_pending"
+    });
+    console.log(`✅ Document ${documentId} status updated to correction_pending`);
+    
     if (TEST_MODE) {
       console.log('🧪 TEST MODE: Skipping N8N correction webhook call');
       console.log('📋 Payload that would be sent:', JSON.stringify(correctionPayload, null, 2));

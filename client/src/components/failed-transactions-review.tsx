@@ -46,7 +46,6 @@ export function FailedTransactionsReview({
     failedTransactions.map(t => ({ ...t }))
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showUploadingState, setShowUploadingState] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -69,7 +68,6 @@ export function FailedTransactionsReview({
 
   const handleResubmit = async () => {
     setIsSubmitting(true);
-    setShowUploadingState(true);
     
     try {
       console.log("Resubmitting corrected transactions:", editingTransactions);
@@ -93,27 +91,23 @@ export function FailedTransactionsReview({
       const result = await response.json();
       console.log('Resubmission result:', result);
       
-      // Keep loading state until webhook processes (don't close immediately)
+      // Show success toast
       toast({
-        title: "Corrections Sent to N8N",
+        title: "Corrections Submitted",
         description: "Processing corrections... The status will update automatically when complete.",
       });
       
-      // Refresh documents data to pick up real-time updates
+      // Immediately close the modal and update the document status
+      setIsSubmitting(false);
+      onResubmit(editingTransactions);
+      onClose();
+      
+      // Refresh documents data to pick up the processing state immediately
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/documents", document.id] });
       
-      // Wait a bit longer to give N8N time to process and send webhook
-      setTimeout(() => {
-        setShowUploadingState(false);
-        setIsSubmitting(false);
-        onResubmit(editingTransactions);
-        onClose();
-      }, 3000); // Keep loading for 3 seconds
-      
     } catch (error) {
       console.error('Resubmission error:', error);
-      setShowUploadingState(false); // Hide uploading state on error
       setIsSubmitting(false);
       toast({
         title: "Resubmission Failed",
@@ -123,25 +117,6 @@ export function FailedTransactionsReview({
     }
   };
 
-
-  // Show uploading state
-  if (showUploadingState) {
-    return (
-      <Dialog open={isOpen} onOpenChange={() => {}}>
-        <DialogContent className="max-w-md">
-          <div className="flex flex-col items-center justify-center p-8 space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
-            <div className="text-center">
-              <h3 className="text-lg font-medium text-gray-900">Processing Corrections</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Resubmitting {editingTransactions.length} corrected transaction(s) to Salesforce...
-              </p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
