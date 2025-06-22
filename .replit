@@ -8,13 +8,17 @@ packages = ["psmisc"]
 
 [deployment]
 deploymentTarget = "autoscale"
-# FIXED: Use dev mode for deployment to avoid caching issues
-build = ["echo", "Skipping build - using dev mode"]
+build = ["echo", "Using dev mode to avoid caching issues"]
 run = ["npm", "run", "dev"]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 16270
+externalPort = 5000
+exposeLocalhost = true
 
 [[ports]]
 localPort = 22559
@@ -30,6 +34,15 @@ exposeLocalhost = true
 localPort = 42321
 externalPort = 3001
 exposeLocalhost = true
+
+[[ports]]
+localPort = 50839
+externalPort = 4200
+exposeLocalhost = true
+
+[[ports]]
+localPort = 54545
+externalPort = 3003
 
 [workflows]
 runButton = "Project"
