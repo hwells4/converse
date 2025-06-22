@@ -190,9 +190,9 @@ router.post("/documents/:id/resubmit-failed-transactions", async (req, res) => {
     
     const { correctedTransactions } = resubmitFailedTransactionsSchema.parse(req.body);
     
-    // Get document details
-    const document = await storage.getDocument(documentId);
-    if (!document) {
+    // Get document details  
+    const documentData = await storage.getDocument(documentId);
+    if (!documentData) {
       return res.status(404).json({ message: "Document not found" });
     }
     
@@ -220,10 +220,19 @@ router.post("/documents/:id/resubmit-failed-transactions", async (req, res) => {
     console.log('🔗 Correction webhook URL (no document ID in URL):', completionWebhookUrl);
     console.log('💡 Document ID will be included in the request body instead');
     
+    // Get current document to access failed transactions
+    const currentDoc = await storage.getDocument(documentId);
+    const currentFailedTransactions = (currentDoc?.metadata as any)?.completionData?.failedTransactions || [];
+    
     const correctionPayload = {
-      transactions: correctedTransactions.map(transaction => ({
+      transactions: correctedTransactions.map((transaction, index) => ({
+        originalFailedTransactionIndex: index, // Track which failed transaction this was
+        // Store the ORIGINAL wrong policy number from before user's edits
+        originalPolicyNumber: currentFailedTransactions[index]?.policyNumber || 
+                            currentFailedTransactions[index]?.originalData?.["Policy Number"] || 
+                            transaction.policyNumber,
         statementId: transaction.commissionStatementId || transaction.originalData["Commission Statement"],
-        policyNumber: transaction.originalData["Policy Number"] || transaction.policyNumber,
+        policyNumber: transaction.originalData["Policy Number"] || transaction.policyNumber, // Corrected policy number
         insuredName: transaction.originalData["Name of Insured"] || null,
         transactionAmount: transaction.originalData["Transaction Amount"] || transaction.transactionAmount
       })),

@@ -78,7 +78,7 @@ const n8nCorrectionPayloadSchema = z.object({
 // N8N completion webhook handler
 const completionHandler = createWebhookHandler(
   "n8n-completion",
-  async (payload, req, res) => {
+  async (payload: any, req, res) => {
     const { documentId, status, completionData } = payload;
     
     console.log(`📄 Processing completion for document ${documentId} with status: ${status}`);
@@ -131,11 +131,12 @@ const completionHandler = createWebhookHandler(
 // N8N correction completion handler
 const correctionHandler = createWebhookHandler(
   "n8n-correction-completion",
-  async (payload, req, res) => {
+  async (payload: any, req, res) => {
     const { documentId, totalProcessed, successCount, failureCount, results, summary } = payload;
     
-    console.log(`📄 Processing correction results for document ${documentId}`);
-    console.log(`📊 Correction Summary: ${totalProcessed} processed, ${successCount} successful, ${failureCount} failed`);
+    console.log(`📄 [v2] Processing correction results for document ${documentId}`);
+    console.log(`📊 [v2] Correction Summary: ${totalProcessed} processed, ${successCount} successful, ${failureCount} failed`);
+    console.log(`🚀 [v2] NEW SIMPLE MATH LOGIC ACTIVE`);
     
     // Get current document state
     const currentDocument = await storage.getDocument(documentId);
@@ -151,20 +152,25 @@ const correctionHandler = createWebhookHandler(
     const currentCompletionData = currentMetadata?.completionData || {};
     const totalTransactions = currentCompletionData.totalTransactions || 0;
     
-    // Calculate which policy numbers were submitted for correction
-    const submittedPolicyNumbers = new Set();
-    (results.successful || []).forEach((success: any) => {
-      submittedPolicyNumbers.add(success.policyNumber);
-    });
-    (results.failed || []).forEach((failed: any) => {
-      submittedPolicyNumbers.add(failed.originalData?.policyNumber || failed.policyNumber);
-    });
+    // For corrections, we know exactly how many transactions were processed
+    // Since we can't reliably match by policy number (they may have changed),
+    // we'll use the counts to update the failed transactions
+    const currentFailedCount = currentCompletionData.failedTransactions?.length || 0;
+    const processedCount = totalProcessed;
     
-    // Remove all transactions that were submitted, add back only new failures
-    const remainingFailedTransactions = (currentCompletionData.failedTransactions || []).filter((failedTx: any) => {
-      const txPolicyNumber = failedTx.policyNumber || failedTx.originalData?.["Policy Number"];
-      return !submittedPolicyNumbers.has(txPolicyNumber);
-    });
+    console.log('🔍 [CORRECTION DEBUG] Current failed count:', currentFailedCount);
+    console.log('🔍 [CORRECTION DEBUG] Current failed transactions:', currentCompletionData.failedTransactions?.map((tx: any) => tx.policyNumber));
+    console.log('🔍 [CORRECTION DEBUG] Processed count:', processedCount);
+    console.log('🔍 [CORRECTION DEBUG] Success count:', successCount);
+    console.log('🔍 [CORRECTION DEBUG] Failure count:', failureCount);
+    
+    // SIMPLEST APPROACH: 
+    // Original failed count - processed count + new failures = final failed count
+    // But since ALL processed transactions were from the failed list, we can just:
+    // 1. Remove ALL processed transactions (both successful and failed)
+    // 2. Add back ONLY the new failures
+    
+    const remainingFailedTransactions = [];  // Start fresh - we'll only keep new failures
     
     const newFailedTransactions = (results.failed || []).map((failedResult: any) => ({
       type: "policy_not_found",
@@ -184,8 +190,15 @@ const correctionHandler = createWebhookHandler(
       commissionStatementId: failedResult.originalData?.statementId
     }));
     
-    const allFailedTransactions = [...remainingFailedTransactions, ...newFailedTransactions];
-    const newSuccessfulCount = totalTransactions - allFailedTransactions.length;
+    // For corrections, the math is simple:
+    // New successful count = old successful + corrections that succeeded
+    const newSuccessfulCount = (currentCompletionData.numberOfSuccessful || 0) + successCount;
+    const allFailedTransactions = newFailedTransactions; // Only the new failures
+    
+    console.log('🔍 [CORRECTION DEBUG] Remaining unprocessed:', remainingFailedTransactions.length);
+    console.log('🔍 [CORRECTION DEBUG] New failures from N8N:', newFailedTransactions.length);
+    console.log('🔍 [CORRECTION DEBUG] Final failed transactions:', allFailedTransactions.map((tx: any) => tx.policyNumber));
+    console.log('🔍 [CORRECTION DEBUG] Final counts - Success:', newSuccessfulCount, 'Failed:', allFailedTransactions.length);
     
     // Validate calculations
     if (newSuccessfulCount < 0 || newSuccessfulCount + allFailedTransactions.length !== totalTransactions) {

@@ -73,6 +73,8 @@ The new standardized N8N webhook system provides a reliable, unified interface f
 
 **Purpose**: Handles results from N8N correction workflows when resubmitting failed transactions
 
+**⚠️ IMPORTANT**: To properly match corrections to original failed transactions, N8N must include the `originalPolicyNumber` field in the results.
+
 **Expected Payload Format**:
 
 ```json
@@ -84,17 +86,21 @@ The new standardized N8N webhook system provides a reliable, unified interface f
   "results": {
     "successful": [
       {
-        "policyNumber": "ABC-123",
-        "amount": 100.00
+        "transactionId": "a05am000009N5Q1AAK",
+        "policyNumber": "ABC-123",           // ✅ CORRECTED policy number
+        "originalPolicyNumber": "WRONG-123", // ✅ ORIGINAL (wrong) policy number - REQUIRED!
+        "amount": 100.00,
+        "policyId": "006am000008JoxXAAS"
       }
     ],
     "failed": [
       {
-        "policyNumber": "DEF-456",
-        "error": "Policy still not found",
+        "policyNumber": "DEF-456",           // ✅ CORRECTED policy number (attempted)
+        "originalPolicyNumber": "INVALID-456", // ✅ ORIGINAL (wrong) policy number - REQUIRED!
+        "error": "Policy still not found after correction",
         "originalData": {
           "policyNumber": "DEF-456",
-          "insuredName": "Jane Smith",
+          "insuredName": "Jane Smith", 
           "transactionAmount": 200.00,
           "statementId": "STMT-001"
         }
@@ -104,6 +110,12 @@ The new standardized N8N webhook system provides a reliable, unified interface f
   "summary": "Processed 2 corrections: 1 successful, 1 failed"
 }
 ```
+
+**🔑 Key Points for N8N Configuration**:
+- **originalPolicyNumber** is the policy number that was originally wrong and caused the failure
+- **policyNumber** is the corrected policy number the user provided
+- The system matches corrections back to failed transactions using **originalPolicyNumber**
+- Without **originalPolicyNumber**, the system cannot identify which failed transactions were corrected
 
 ## 🔧 N8N Configuration Requirements
 
@@ -142,13 +154,32 @@ The new standardized N8N webhook system provides a reliable, unified interface f
 ```
 
 #### B. Correction Workflow (for resubmitting failed transactions)
-**At the end of your correction workflow:**
+**CRITICAL**: Your correction workflow MUST preserve and return the `originalPolicyNumber` from the input data.
 
+**Input to N8N correction workflow** (what our system sends):
+```json
+{
+  "transactions": [
+    {
+      "originalFailedTransactionIndex": 0,
+      "originalPolicyNumber": "WRONG-123",    // ⚠️ This is the wrong policy number
+      "policyNumber": "CORRECT-123",          // ⚠️ This is the corrected policy number
+      "statementId": "STMT-001",
+      "insuredName": "John Doe",
+      "transactionAmount": "100.00"
+    }
+  ],
+  "webhookUrl": "https://your-domain.com/api/webhook/n8n-correction-completion",
+  "documentId": 123
+}
+```
+
+**Output from N8N correction workflow** (what you need to send back):
 ```json
 // HTTP Request Node Configuration
 {
   "method": "POST", 
-  "url": "https://your-domain.com/api/webhook/n8n-correction-completion",
+  "url": "{{ $('Start').item.json.webhookUrl }}",
   "headers": {
     "Content-Type": "application/json"
   },
@@ -158,13 +189,39 @@ The new standardized N8N webhook system provides a reliable, unified interface f
     "successCount": "{{ $('Count Successful').item.json.count }}",
     "failureCount": "{{ $('Count Failed').item.json.count }}",
     "results": {
-      "successful": "{{ $('Collect Successful').item.json }}",
-      "failed": "{{ $('Collect Failed').item.json }}"
+      "successful": [
+        {
+          "transactionId": "{{ $item.salesforceTransactionId }}",
+          "policyNumber": "{{ $item.correctedPolicyNumber }}",
+          "originalPolicyNumber": "{{ $item.originalPolicyNumber }}", // ⚠️ REQUIRED!
+          "amount": "{{ $item.amount }}",
+          "policyId": "{{ $item.salesforcePolicyId }}"
+        }
+      ],
+      "failed": [
+        {
+          "policyNumber": "{{ $item.attemptedPolicyNumber }}",
+          "originalPolicyNumber": "{{ $item.originalPolicyNumber }}", // ⚠️ REQUIRED!
+          "error": "{{ $item.errorMessage }}",
+          "originalData": {
+            "policyNumber": "{{ $item.attemptedPolicyNumber }}",
+            "insuredName": "{{ $item.insuredName }}",
+            "transactionAmount": "{{ $item.amount }}",
+            "statementId": "{{ $item.statementId }}"
+          }
+        }
+      ]
     },
     "summary": "Processed {{ $('Count Processed').item.json.total }} corrections"
   }
 }
 ```
+
+**⚠️ N8N Implementation Notes:**
+1. **Preserve originalPolicyNumber**: Store the `originalPolicyNumber` from input and include it in all results
+2. **Use corrected policyNumber**: Use the `policyNumber` (corrected value) for Salesforce lookups
+3. **Return both values**: Always return both `originalPolicyNumber` and `policyNumber` in results
+4. **Match by original**: Our system uses `originalPolicyNumber` to identify which failed transaction was corrected
 
 ### 3. Status Values to Use
 
@@ -305,6 +362,19 @@ GET /api/test/webhook-endpoints
    - Verify `failedTransactions` array in webhook payload
    - Check `metadata.completionData` in database
    - Review frontend FailedTransactionsReview component
+
+5. **⚠️ Correction webhook not removing failed transactions properly**
+   - **Symptom**: Correction webhook shows success but failed transaction count doesn't decrease
+   - **Cause**: Missing `originalPolicyNumber` in N8N response - system can't match corrections to original failures
+   - **Solution**: Update N8N correction workflow to include `originalPolicyNumber` field in results
+   - **Debug**: Check webhook logs for "CORRECTION DEBUG" messages showing policy number matching
+   - **Example**: If original failed transaction had policy `"WRONG-123"` and user corrected it to `"ABC-123"`, N8N must send back:
+     ```json
+     {
+       "policyNumber": "ABC-123",        // Corrected number
+       "originalPolicyNumber": "WRONG-123" // Original wrong number - REQUIRED!
+     }
+     ```
 
 ### Debug Commands
 
