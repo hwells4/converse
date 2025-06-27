@@ -13,6 +13,16 @@ npm run check        # Run TypeScript type checking
 npm run db:push      # Push database schema changes via Drizzle
 ```
 
+### Invitation Management
+```bash
+npm run create-invitation                    # Create invitation token (any email)
+npm run create-invitation -- --email user@example.com    # Create email-specific invitation
+npm run create-invitation -- --email user@example.com --days 7    # Custom expiry
+npm run create-invitation -- --email user@example.com --no-email   # Skip email sending
+npm run list-invitations                    # List all invitation tokens
+npm run list-invitations -- --unused-only   # List only unused tokens
+```
+
 ### Development Workflow
 - Always run `npm run check` before commits to ensure TypeScript compliance
 - Use `npm run db:push` after schema changes in `shared/schema.ts`
@@ -33,6 +43,7 @@ This is a full-stack TypeScript application for processing insurance commission 
 ### Project Structure
 - `/client` - React frontend application
   - `/src/components` - UI components (mostly shadcn/ui)
+    - `profile-menu.tsx` - Dropdown profile menu with user info and logout
   - `/src/hooks` - Custom React hooks (upload, documents, carriers, auth)
   - `/src/lib` - Utilities and service layers (AWS service, query client, auth utilities)
   - `/src/pages` - Page components (home, documents, sign-in, sign-up, forgot-password, reset-password)
@@ -67,13 +78,17 @@ This is a full-stack TypeScript application for processing insurance commission 
   - `/utils` - Utility functions
     - `webhook-security.ts` - Webhook authentication helpers
     - `csv-parser.ts` - CSV parsing utilities
-    - `email-service.ts` - Password reset email functionality
+    - `email-service.ts` - Email service for password resets and invitation emails
   - `/middleware` - Express middleware
     - `auth.ts` - Authentication middleware and route protection
   - `/types` - TypeScript type definitions
     - `session.ts` - Session type extensions for express-session
 - `/shared` - Shared types and schemas
   - `schema.ts` - Drizzle schema and Zod validation schemas
+- `/scripts` - Utility scripts
+  - `create-invitation.ts` - Create invitation tokens with email sending
+  - `list-invitations.ts` - List and manage invitation tokens
+  - `create-demo-user.ts` - Create demo user account
 - `/migrations` - Database migrations
 
 ### Key Workflows
@@ -92,15 +107,29 @@ This is a full-stack TypeScript application for processing insurance commission 
    - Triggers N8N webhook for Salesforce upload
    - N8N completion webhook updates document status to "completed"
 
+3. **Invitation-Only Registration Flow**:
+   - Admin creates invitation token via script or API
+   - Invitation email automatically sent to recipient (if email provided)
+   - User receives professional invitation email with direct signup link
+   - User clicks link or enters token manually on signup page
+   - System validates token (not used, not expired, email match if required)
+   - User completes registration and token is marked as used
+
 ### API Endpoints
 
 #### Authentication (`/server/routes/auth.ts`) **[NEW]**
-- `POST /api/auth/register` - User registration with validation
+- `POST /api/auth/register` - User registration with invitation token validation
 - `POST /api/auth/login` - User login with session creation
 - `POST /api/auth/logout` - User logout and session destruction
 - `GET /api/auth/me` - Get current authenticated user
 - `POST /api/auth/forgot-password` - Request password reset email
 - `POST /api/auth/reset-password` - Reset password with token
+
+#### Invitation Management (`/server/routes/auth.ts`) **[NEW]**
+- `POST /api/auth/create-invitation` - Create invitation tokens with optional email sending
+- `POST /api/auth/validate-invitation` - Validate invitation token before signup
+- `POST /api/auth/send-invitation` - Send invitation email for existing token
+- `GET /api/auth/invitations` - List all invitation tokens with status
 
 #### Carrier Management (`/server/routes/carriers.ts`)
 - `GET /api/carriers` - List all carriers
@@ -157,10 +186,10 @@ This is a full-stack TypeScript application for processing insurance commission 
 ### Environment Variables Required
 - `DATABASE_URL` - PostgreSQL connection string
 - `SESSION_SECRET` - Secret key for session signing (change in production)
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` - Email service configuration for password resets
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` - Email service configuration for password resets and invitations
 - `SMTP_SECURE` - Whether to use secure SMTP connection (true/false)
 - `FROM_NAME` - Display name for outgoing emails (defaults to "Converse AI Hub")
-- `CLIENT_URL` - Frontend URL for password reset links (defaults to http://localhost:5000)
+- `CLIENT_URL` - Frontend URL for password reset and invitation links (defaults to http://localhost:5000)
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` - AWS credentials
 - `AWS_S3_BUCKET` - S3 bucket name
 - `PDF_PARSER_WEBHOOK_URL` - Railway service webhook URL
@@ -171,6 +200,7 @@ This is a full-stack TypeScript application for processing insurance commission 
 Main tables:
 - `users` - User accounts with bcrypt password hashing, email, and reset tokens
 - `sessions` - PostgreSQL-backed session storage for authentication
+- `invitation_tokens` - Invitation tokens with expiry, usage tracking, and email binding
 - `carriers` - Insurance carriers with Salesforce IDs
 - `documents` - Uploaded documents with processing status tracking
 
@@ -205,6 +235,7 @@ Document statuses: uploaded → processing → processed → salesforce_upload_p
 - **Password Security**: Passwords are hashed with bcrypt (12 rounds) and never stored in plaintext
 - **Session Security**: Sessions use secure cookies with httpOnly, sameSite, and secure flags in production
 - **Rate Limiting**: Auth endpoints have rate limiting (5 attempts per 15 minutes, 3 password resets per hour)
+- **Invitation-Only Registration**: Public signup disabled, requires valid invitation tokens
 
 ### Code Organization Principles
 - **Database Schema**: All schema changes MUST be made in `shared/schema.ts` first using Drizzle + Zod
@@ -260,11 +291,109 @@ The following API endpoints require authentication:
 - Document resubmission
 
 #### Authentication Workflow
-1. **Registration**: Users create accounts with username, email, and secure password
-2. **Login**: Session-based authentication with secure cookies
-3. **Password Reset**: Email-based reset flow with secure tokens
-4. **Route Protection**: Automatic redirect to sign-in for unauthenticated requests
-5. **Session Management**: Rolling sessions that extend on activity
+1. **Invitation**: Admin creates invitation tokens and sends professional invitation emails
+2. **Registration**: Users create accounts with username, email, password, and valid invitation token
+3. **Login**: Session-based authentication with secure cookies (2-week rolling expiry)
+4. **Password Reset**: Email-based reset flow with secure tokens
+5. **Route Protection**: Automatic redirect to sign-in for unauthenticated requests
+6. **Session Management**: Rolling sessions that extend on activity
+
+## Invitation-Only Registration System
+
+### Overview
+The application implements a complete invitation-only signup system to control user access. Public registration is disabled and all new users must have a valid invitation token.
+
+### Invitation Token Features
+- **Unique tokens**: Cryptographically secure 64-character hex tokens
+- **Email binding**: Tokens can be tied to specific email addresses
+- **Expiry control**: Configurable expiry (default 30 days)
+- **Single-use**: Tokens automatically marked as used after successful registration
+- **Audit trail**: Tracks who created tokens, when used, and by whom
+
+### Email Integration
+- **Professional email templates**: HTML and text versions with Converse AI Hub branding
+- **Direct signup links**: Email includes pre-filled signup URL with token
+- **Platform features showcase**: Email highlights AI-powered document processing capabilities
+- **Automatic sending**: Emails sent automatically when invitation created with email address
+- **Graceful fallback**: Shows token in console if email configuration missing
+
+### Admin Management Tools
+
+#### Command Line Scripts
+```bash
+# Create general invitation (any email can use)
+npm run create-invitation
+
+# Create email-specific invitation with auto-email
+npm run create-invitation -- --email user@example.com
+
+# Create invitation with custom expiry
+npm run create-invitation -- --email user@example.com --days 7
+
+# Create invitation without sending email
+npm run create-invitation -- --email user@example.com --no-email
+
+# List all invitations with status
+npm run list-invitations
+
+# List only unused invitations
+npm run list-invitations -- --unused-only
+```
+
+#### API Endpoints
+```bash
+# Create invitation with email sending
+POST /api/auth/create-invitation
+{
+  "email": "user@example.com",
+  "sendEmail": true  # optional, defaults to true
+}
+
+# Validate invitation before signup
+POST /api/auth/validate-invitation
+{
+  "token": "invitation-token-here"
+}
+
+# Send email for existing invitation
+POST /api/auth/send-invitation
+{
+  "email": "user@example.com",
+  "invitationToken": "existing-token"
+}
+
+# List all invitations (admin only)
+GET /api/auth/invitations
+```
+
+### User Experience
+1. **Admin creates invitation** via script or API
+2. **Professional email sent** with branded template and direct signup link
+3. **User clicks email link** and taken to signup page with token pre-filled
+4. **User completes registration** with username, email, password, and token
+5. **Token validated** against database (not used, not expired, email match)
+6. **Account created** and user immediately logged in
+7. **Token marked as used** to prevent reuse
+
+### Security Features
+- **Token validation**: Checks expiry, usage status, and email binding
+- **Rate limiting**: Prevents invitation spam
+- **Audit logging**: Full trail of invitation creation and usage
+- **Email verification**: Optional email binding ensures invitations reach intended recipients
+
+## UI Improvements
+
+### Profile Dropdown Menu
+- **Replaced inline profile display** with clean dropdown menu
+- **User avatar icon** that opens dropdown on click
+- **Professional layout** showing username, email, and logout option
+- **Consistent across pages** (home and documents)
+- **Better space utilization** in header area
+
+### Auto-Dismissing Toasts
+- **Login success toasts** automatically disappear after 5 seconds
+- **Consistent toast behavior** across all authentication actions
+- **User-friendly notifications** for all auth state changes
 
 ### Branding Updates
 Application has been rebranded as **Converse AI Hub**:
