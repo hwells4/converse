@@ -16,8 +16,12 @@ import { DocumentStatusDebugger } from "@/components/document-status-debugger";
 import { FileText, ArrowLeft, Search, Filter, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { useRequireAuth } from "@/hooks/use-auth";
+import { ProfileMenu } from "@/components/profile-menu";
 
 export default function Documents() {
+  const { isLoading: isAuthLoading, user } = useRequireAuth();
+  
   const { data: documents, isLoading } = useDocuments();
   const deleteDocument = useDeleteDocument();
   const { toast } = useToast();
@@ -189,6 +193,18 @@ export default function Documents() {
     return matchesSearch && matchesStatus && matchesType;
   }) || [];
 
+  // Show loading while checking authentication
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -208,10 +224,11 @@ export default function Documents() {
                   <Shield className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-semibold text-gray-900">Document Management</h1>
+                  <h1 className="text-xl font-semibold text-gray-900">Converse AI Hub</h1>
                 </div>
               </div>
             </div>
+            {user && <ProfileMenu user={user} />}
           </div>
         </div>
       </header>

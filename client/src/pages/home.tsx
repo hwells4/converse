@@ -4,9 +4,14 @@ import { RecentDocuments } from "@/components/recent-documents";
 import { ToastNotifications } from "@/components/toast-notifications";
 import { CSVUploadWizard } from "@/components/csv-upload-wizard";
 import { Button } from "@/components/ui/button";
-import { FileText, DollarSign, Shield, User } from "lucide-react";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { FileText, DollarSign, Shield } from "lucide-react";
+import { useRequireAuth } from "@/hooks/use-auth";
+import { ProfileMenu } from "@/components/profile-menu";
 
 export default function Home() {
+  const { isLoading, user } = useRequireAuth();
+  
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedDocumentType, setSelectedDocumentType] = useState<"commission" | "renewal" | null>(null);
   const [csvWizardData, setCsvWizardData] = useState<{
@@ -54,6 +59,18 @@ export default function Home() {
     handleCloseCSVWizard();
   };
 
+  // Show loading while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -65,18 +82,11 @@ export default function Home() {
                 <Shield className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Converse Insurance</h1>
-                <p className="text-sm text-gray-500">Document Processing Platform</p>
+                <h1 className="text-xl font-semibold text-gray-900">Converse AI Hub</h1>
+                <p className="text-sm text-gray-500">Intelligent Document Processing Platform</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-gray-500">
-                John Smith
-              </div>
-              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                <User className="h-4 w-4 text-gray-600" />
-              </div>
-            </div>
+            {user && <ProfileMenu user={user} />}
           </div>
         </div>
       </header>
@@ -85,9 +95,9 @@ export default function Home() {
         {/* Welcome Section */}
         <div className="text-center mb-12">
           <div className="mb-8">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Welcome to Converse Insurance</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Welcome to Converse AI Hub</h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Upload your documents for automated processing. Our advanced system will extract and analyze data from your PDFs, providing you with structured CSV reports.
+              Upload your documents for intelligent processing. Our AI-powered system will extract and analyze data from your PDFs, providing you with structured insights and reports.
             </p>
           </div>
 
@@ -99,7 +109,7 @@ export default function Home() {
                   <DollarSign className="h-8 w-8 text-blue-600" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Commission Statement</h3>
-                <p className="text-gray-600 text-sm">Upload commission statements for automated data extraction and reporting</p>
+                <p className="text-gray-600 text-sm">Upload commission statements for AI-powered data extraction and reporting</p>
               </div>
               <Button 
                 onClick={() => handleUploadClick("commission")}
@@ -118,7 +128,7 @@ export default function Home() {
                   <FileText className="h-8 w-8 text-green-600" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">Renewal Report</h3>
-                <p className="text-gray-600 text-sm">Upload renewal reports for policy analysis and data processing</p>
+                <p className="text-gray-600 text-sm">Upload renewal reports for AI-powered policy analysis and data processing</p>
               </div>
               <Button 
                 onClick={() => handleUploadClick("renewal")}
