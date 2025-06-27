@@ -8,7 +8,10 @@
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "script": "tsx",
+    "create-invitation": "tsx scripts/create-invitation.ts",
+    "list-invitations": "tsx scripts/list-invitations.ts"
   },
   "dependencies": {
     "@aws-sdk/client-lambda": "^3.817.0",

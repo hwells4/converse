@@ -15,6 +15,7 @@ interface SignUpForm {
   email: string;
   password: string;
   confirmPassword: string;
+  invitationToken: string;
 }
 
 interface SignUpResponse {
@@ -41,6 +42,7 @@ export default function SignUpPage() {
     email: "",
     password: "",
     confirmPassword: "",
+    invitationToken: "",
   });
 
   const signUpMutation = useMutation({
@@ -178,6 +180,22 @@ export default function SignUpPage() {
               {!passwordsMatch && (
                 <p className="text-xs text-red-500">Passwords do not match</p>
               )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invitationToken">Invitation Token</Label>
+              <Input
+                id="invitationToken"
+                name="invitationToken"
+                type="text"
+                value={formData.invitationToken}
+                onChange={handleInputChange}
+                required
+                placeholder="Enter your invitation token"
+                disabled={signUpMutation.isPending}
+              />
+              <p className="text-xs text-gray-500">
+                You need an invitation token to create an account
+              </p>
             </div>
             {signUpMutation.error && (
               <Alert variant="destructive">

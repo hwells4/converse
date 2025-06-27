@@ -15,6 +15,19 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Invitation tokens table for invitation-only registration
+export const invitationTokens = pgTable("invitation_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  email: text("email"), // Optional: can be tied to specific email
+  isUsed: boolean("is_used").notNull().default(false),
+  usedBy: integer("used_by").references(() => users.id),
+  expiresAt: timestamp("expires_at"), // Optional: tokens can expire
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  usedAt: timestamp("used_at"),
+});
+
 // Sessions table is managed by connect-pg-simple, not Drizzle
 // This table will be automatically created by connect-pg-simple with the correct schema:
 // - sid (varchar): session ID
@@ -80,6 +93,20 @@ export type Carrier = typeof carriers.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type UpdateDocument = z.infer<typeof updateDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+
+// Invitation token schemas
+export const insertInvitationTokenSchema = createInsertSchema(invitationTokens, {
+  token: z.string().min(1, "Token is required"),
+  email: z.string().email("Valid email is required").optional(),
+  expiresAt: z.date().optional(),
+});
+
+export const validateInvitationTokenSchema = z.object({
+  token: z.string().min(1, "Invitation token is required"),
+});
+
+export type InsertInvitationToken = z.infer<typeof insertInvitationTokenSchema>;
+export type InvitationToken = typeof invitationTokens.$inferSelect;
 
 // CSV data structure for preview
 export const csvDataSchema = z.object({
@@ -217,6 +244,11 @@ export const insertUserSchema = createInsertSchema(users).omit({
     .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain at least one lowercase letter, one uppercase letter, and one number"),
 });
 
+// Registration schema with invitation token requirement
+export const registerWithInvitationSchema = insertUserSchema.extend({
+  invitationToken: z.string().min(1, "Invitation token is required"),
+});
+
 export const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
@@ -233,6 +265,7 @@ export const resetPasswordSchema = z.object({
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type RegisterWithInvitation = z.infer<typeof registerWithInvitationSchema>;
 export type User = typeof users.$inferSelect;
 export type LoginRequest = z.infer<typeof loginSchema>;
 export type ForgotPasswordRequest = z.infer<typeof forgotPasswordSchema>;

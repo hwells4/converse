@@ -20,7 +20,8 @@
       "Bash(true)",
       "Bash(npm install:*)",
       "Bash(touch:*)",
-      "Bash(npx:*)"
+      "Bash(npx:*)",
+      "Bash(npm run:*)"
     ],
     "deny": []
   }

@@ -3,9 +3,12 @@ import "../types/session"; // Import session type extensions
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { db } from "../db";
-import { users } from "../../shared/schema";
+import { users, invitationTokens } from "../../shared/schema";
 import { 
   insertUserSchema, 
+  registerWithInvitationSchema,
+  insertInvitationTokenSchema,
+  validateInvitationTokenSchema,
   loginSchema, 
   forgotPasswordSchema, 
   resetPasswordSchema,
@@ -44,8 +47,48 @@ const resetLimiter = rateLimit({
 // User registration
 router.post("/register", authLimiter, requireGuest, async (req, res) => {
   try {
-    // Validate input
-    const validatedData = insertUserSchema.parse(req.body);
+    // Validate input with invitation token
+    const validatedData = registerWithInvitationSchema.parse(req.body);
+    
+    // Validate invitation token
+    const invitation = await db
+      .select()
+      .from(invitationTokens)
+      .where(eq(invitationTokens.token, validatedData.invitationToken))
+      .limit(1);
+
+    if (invitation.length === 0) {
+      return res.status(400).json({
+        message: "Invalid invitation token",
+        error: "INVALID_INVITATION",
+      });
+    }
+
+    const invitationToken = invitation[0];
+
+    // Check if token is already used
+    if (invitationToken.isUsed) {
+      return res.status(400).json({
+        message: "This invitation token has already been used",
+        error: "INVITATION_USED",
+      });
+    }
+
+    // Check if token is expired
+    if (invitationToken.expiresAt && new Date() > invitationToken.expiresAt) {
+      return res.status(400).json({
+        message: "This invitation token has expired",
+        error: "INVITATION_EXPIRED",
+      });
+    }
+
+    // If invitation is tied to a specific email, validate it matches
+    if (invitationToken.email && invitationToken.email !== validatedData.email) {
+      return res.status(400).json({
+        message: "Email address does not match the invitation",
+        error: "EMAIL_MISMATCH",
+      });
+    }
     
     // Check if user already exists
     const existingUser = await db
@@ -97,6 +140,16 @@ router.post("/register", authLimiter, requireGuest, async (req, res) => {
       });
 
     const user = newUser[0];
+
+    // Mark invitation token as used
+    await db
+      .update(invitationTokens)
+      .set({
+        isUsed: true,
+        usedBy: user.id,
+        usedAt: new Date(),
+      })
+      .where(eq(invitationTokens.token, validatedData.invitationToken));
 
     // Create session
     req.session.userId = user.id;
@@ -420,6 +473,152 @@ router.post("/reset-password", authLimiter, async (req, res) => {
 
     res.status(500).json({
       message: "Password reset failed",
+      error: "INTERNAL_ERROR",
+    });
+  }
+});
+
+// ===== INVITATION TOKEN MANAGEMENT =====
+
+// Create invitation token (admin only - for now anyone can create)
+router.post("/create-invitation", requireAuth, async (req, res) => {
+  try {
+    const authenticatedReq = req as AuthenticatedRequest;
+    
+    // Parse and validate the invitation data
+    const validatedData = insertInvitationTokenSchema.parse({
+      ...req.body,
+      createdBy: authenticatedReq.user.id,
+    });
+
+    // Generate a unique token
+    const token = crypto.randomBytes(32).toString('hex');
+    
+    // Create expiry date (30 days from now)
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    // Insert into database
+    const [newInvitation] = await db
+      .insert(invitationTokens)
+      .values({
+        ...validatedData,
+        token,
+        expiresAt,
+      })
+      .returning();
+
+    res.status(201).json({
+      message: "Invitation token created successfully",
+      invitation: {
+        id: newInvitation.id,
+        token: newInvitation.token,
+        email: newInvitation.email,
+        expiresAt: newInvitation.expiresAt,
+        createdAt: newInvitation.createdAt,
+      },
+    });
+  } catch (error: any) {
+    console.error("Create invitation error:", error);
+    
+    if (error.name === "ZodError") {
+      return res.status(400).json({
+        message: "Invalid invitation data",
+        error: "VALIDATION_ERROR",
+        details: error.errors,
+      });
+    }
+
+    res.status(500).json({
+      message: "Failed to create invitation",
+      error: "INTERNAL_ERROR",
+    });
+  }
+});
+
+// Validate invitation token (public endpoint)
+router.post("/validate-invitation", async (req, res) => {
+  try {
+    const validatedData = validateInvitationTokenSchema.parse(req.body);
+
+    // Find the invitation token
+    const invitation = await db
+      .select()
+      .from(invitationTokens)
+      .where(eq(invitationTokens.token, validatedData.token))
+      .limit(1);
+
+    if (invitation.length === 0) {
+      return res.status(400).json({
+        message: "Invalid invitation token",
+        error: "INVALID_TOKEN",
+      });
+    }
+
+    const token = invitation[0];
+
+    // Check if token is already used
+    if (token.isUsed) {
+      return res.status(400).json({
+        message: "Invitation token has already been used",
+        error: "TOKEN_USED",
+      });
+    }
+
+    // Check if token is expired
+    if (token.expiresAt && new Date() > token.expiresAt) {
+      return res.status(400).json({
+        message: "Invitation token has expired",
+        error: "TOKEN_EXPIRED",
+      });
+    }
+
+    res.json({
+      message: "Invitation token is valid",
+      valid: true,
+      email: token.email, // Return associated email if any
+    });
+  } catch (error: any) {
+    console.error("Validate invitation error:", error);
+    
+    if (error.name === "ZodError") {
+      return res.status(400).json({
+        message: "Invalid request data",
+        error: "VALIDATION_ERROR",
+        details: error.errors,
+      });
+    }
+
+    res.status(500).json({
+      message: "Failed to validate invitation",
+      error: "INTERNAL_ERROR",
+    });
+  }
+});
+
+// List invitation tokens (admin only - for now anyone authenticated can list)
+router.get("/invitations", requireAuth, async (req, res) => {
+  try {
+    const invitations = await db
+      .select({
+        id: invitationTokens.id,
+        token: invitationTokens.token,
+        email: invitationTokens.email,
+        isUsed: invitationTokens.isUsed,
+        expiresAt: invitationTokens.expiresAt,
+        createdAt: invitationTokens.createdAt,
+        usedAt: invitationTokens.usedAt,
+      })
+      .from(invitationTokens)
+      .orderBy(invitationTokens.createdAt);
+
+    res.json({
+      invitations,
+    });
+  } catch (error: any) {
+    console.error("List invitations error:", error);
+    res.status(500).json({
+      message: "Failed to list invitations",
       error: "INTERNAL_ERROR",
     });
   }
