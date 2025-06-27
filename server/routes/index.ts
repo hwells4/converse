@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 
 // Import route modules
+import { authRoutes } from "./auth";
 import { carrierRoutes } from "./carriers";
 import { documentRoutes } from "./documents";
 import { documentStatusRoutes } from "./documents-status";
@@ -18,6 +19,7 @@ import { debugRoutes } from "./debug/test";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register route modules
+  app.use("/api/auth", authRoutes);
   app.use("/api", carrierRoutes);
   app.use("/api", documentRoutes);
   app.use("/api", documentStatusRoutes);

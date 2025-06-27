@@ -20,21 +20,22 @@ npm run db:push      # Push database schema changes via Drizzle
 
 ## Architecture Overview
 
-This is a full-stack TypeScript application for processing insurance commission statements and renewal reports.
+This is a full-stack TypeScript application for processing insurance commission statements and renewal reports, now branded as **Converse AI Hub** with complete custom authentication system.
 
 ### Tech Stack
 - **Frontend**: React 18 with TypeScript, Vite, TanStack Query, Tailwind CSS, shadcn/ui components
 - **Backend**: Express.js with TypeScript, running on Node.js
-- **Database**: PostgreSQL with Drizzle ORM
+- **Authentication**: Custom session-based auth with bcrypt password hashing
+- **Database**: PostgreSQL with Drizzle ORM (includes users/sessions tables)
 - **Storage**: AWS S3 for document storage
 - **External Services**: Railway service for PDF processing, Doctly.ai for document parsing, N8N for Salesforce integration
 
 ### Project Structure
 - `/client` - React frontend application
   - `/src/components` - UI components (mostly shadcn/ui)
-  - `/src/hooks` - Custom React hooks (upload, documents, carriers)
-  - `/src/lib` - Utilities and service layers (AWS service, query client)
-  - `/src/pages` - Page components (home, documents)
+  - `/src/hooks` - Custom React hooks (upload, documents, carriers, auth)
+  - `/src/lib` - Utilities and service layers (AWS service, query client, auth utilities)
+  - `/src/pages` - Page components (home, documents, sign-in, sign-up, forgot-password, reset-password)
 - `/server` - Express backend
   - `index.ts` - Server entry point with middleware setup
   - `routes.ts` - Backward compatibility barrel export for routes
@@ -43,6 +44,7 @@ This is a full-stack TypeScript application for processing insurance commission 
   - `aws-service.ts` - AWS S3 operations
   - `/routes` - Modular route definitions
     - `index.ts` - Main route registration
+    - `auth.ts` - Authentication endpoints (login, register, logout, password reset)
     - `carriers.ts` - Carrier management endpoints
     - `documents.ts` - Document CRUD operations
     - `/aws` - AWS service routes
@@ -65,6 +67,11 @@ This is a full-stack TypeScript application for processing insurance commission 
   - `/utils` - Utility functions
     - `webhook-security.ts` - Webhook authentication helpers
     - `csv-parser.ts` - CSV parsing utilities
+    - `email-service.ts` - Password reset email functionality
+  - `/middleware` - Express middleware
+    - `auth.ts` - Authentication middleware and route protection
+  - `/types` - TypeScript type definitions
+    - `session.ts` - Session type extensions for express-session
 - `/shared` - Shared types and schemas
   - `schema.ts` - Drizzle schema and Zod validation schemas
 - `/migrations` - Database migrations
@@ -86,6 +93,14 @@ This is a full-stack TypeScript application for processing insurance commission 
    - N8N completion webhook updates document status to "completed"
 
 ### API Endpoints
+
+#### Authentication (`/server/routes/auth.ts`) **[NEW]**
+- `POST /api/auth/register` - User registration with validation
+- `POST /api/auth/login` - User login with session creation
+- `POST /api/auth/logout` - User logout and session destruction
+- `GET /api/auth/me` - Get current authenticated user
+- `POST /api/auth/forgot-password` - Request password reset email
+- `POST /api/auth/reset-password` - Reset password with token
 
 #### Carrier Management (`/server/routes/carriers.ts`)
 - `GET /api/carriers` - List all carriers
@@ -141,6 +156,11 @@ This is a full-stack TypeScript application for processing insurance commission 
 
 ### Environment Variables Required
 - `DATABASE_URL` - PostgreSQL connection string
+- `SESSION_SECRET` - Secret key for session signing (change in production)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` - Email service configuration for password resets
+- `SMTP_SECURE` - Whether to use secure SMTP connection (true/false)
+- `FROM_NAME` - Display name for outgoing emails (defaults to "Converse AI Hub")
+- `CLIENT_URL` - Frontend URL for password reset links (defaults to http://localhost:5000)
 - `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` - AWS credentials
 - `AWS_S3_BUCKET` - S3 bucket name
 - `PDF_PARSER_WEBHOOK_URL` - Railway service webhook URL
@@ -149,6 +169,8 @@ This is a full-stack TypeScript application for processing insurance commission 
 
 ### Database Schema
 Main tables:
+- `users` - User accounts with bcrypt password hashing, email, and reset tokens
+- `sessions` - PostgreSQL-backed session storage for authentication
 - `carriers` - Insurance carriers with Salesforce IDs
 - `documents` - Uploaded documents with processing status tracking
 
@@ -179,6 +201,10 @@ Document statuses: uploaded → processing → processed → salesforce_upload_p
 - All AWS operations (S3, Lambda) MUST be executed server-side only
 - Use presigned URLs for client-side S3 uploads
 - Validate all webhook requests with security tokens where possible
+- **Authentication**: All protected API endpoints require valid session authentication
+- **Password Security**: Passwords are hashed with bcrypt (12 rounds) and never stored in plaintext
+- **Session Security**: Sessions use secure cookies with httpOnly, sameSite, and secure flags in production
+- **Rate Limiting**: Auth endpoints have rate limiting (5 attempts per 15 minutes, 3 password resets per hour)
 
 ### Code Organization Principles
 - **Database Schema**: All schema changes MUST be made in `shared/schema.ts` first using Drizzle + Zod
@@ -198,3 +224,51 @@ Document statuses: uploaded → processing → processed → salesforce_upload_p
 - **Webhook Response Format**: All webhooks return standardized `WebhookResponse` interface with `success`, `message`, `data`, and `error` fields
 - **Payload Validation**: Webhooks validate incoming payloads using Zod schemas with detailed error reporting
 - **Correction Processing**: Advanced logic to handle N8N correction callbacks with transaction count reconciliation
+
+## Authentication System
+
+### Implementation Details
+The application now uses a complete custom authentication system replacing any previous Clerk integration:
+
+#### Backend Authentication
+- **Session-based authentication** using `express-session` with PostgreSQL storage
+- **Password hashing** with bcrypt (12 rounds)
+- **Email-based password reset** with secure tokens (1-hour expiry)
+- **Rate limiting** on authentication endpoints
+- **Middleware protection** for all sensitive API routes
+
+#### Frontend Authentication
+- **Custom auth pages**: Sign-in, Sign-up, Forgot Password, Reset Password
+- **Auth state management** using React Query
+- **Automatic redirects** for protected routes
+- **Session persistence** across browser sessions
+- **User profile display** with logout functionality
+
+#### Demo Account
+A demo account has been created for testing:
+- **Username**: `demo`
+- **Email**: `demo@converseai.com`
+- **Password**: `ConverseDemo2024!`
+
+#### Protected Routes
+The following API endpoints require authentication:
+- Document management (POST, PATCH, DELETE operations)
+- Carrier management (POST, PATCH, DELETE operations) 
+- S3 operations (all POST requests)
+- Processing triggers (PDF parser, Lambda invocations)
+- N8N integrations
+- Document resubmission
+
+#### Authentication Workflow
+1. **Registration**: Users create accounts with username, email, and secure password
+2. **Login**: Session-based authentication with secure cookies
+3. **Password Reset**: Email-based reset flow with secure tokens
+4. **Route Protection**: Automatic redirect to sign-in for unauthenticated requests
+5. **Session Management**: Rolling sessions that extend on activity
+
+### Branding Updates
+Application has been rebranded as **Converse AI Hub**:
+- All page headers and titles updated
+- Email templates use "Converse AI Hub" branding
+- Welcome messages emphasize "AI-powered" processing
+- Consistent branding across all authentication pages

@@ -1,6 +1,33 @@
-import { pgTable, text, serial, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Users table for authentication
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  resetToken: text("reset_token"),
+  resetTokenExpires: timestamp("reset_token_expires"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Sessions table is managed by connect-pg-simple, not Drizzle
+// This table will be automatically created by connect-pg-simple with the correct schema:
+// - sid (varchar): session ID
+// - sess (json): session data  
+// - expire (timestamp): expiration time
+// export const sessions = pgTable("sessions", {
+//   id: text("id").primaryKey(), // session ID
+//   userId: integer("user_id").references(() => users.id).notNull(),
+//   data: jsonb("data").notNull(),
+//   expiresAt: timestamp("expires_at").notNull(),
+//   createdAt: timestamp("created_at").defaultNow().notNull(),
+//   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+// });
 
 // Carriers table for managing insurance carriers
 export const carriers = pgTable("carriers", {
@@ -177,3 +204,38 @@ export const n8nCompletionWebhookArraySchema = z.array(n8nCompletionWebhookSchem
 
 export type N8NCompletionWebhook = z.infer<typeof n8nCompletionWebhookSchema>;
 export type N8NCompletionWebhookArray = z.infer<typeof n8nCompletionWebhookArraySchema>;
+
+// Auth-related schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  resetToken: true,
+  resetTokenExpires: true,
+}).extend({
+  password: z.string().min(8, "Password must be at least 8 characters")
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain at least one lowercase letter, one uppercase letter, and one number"),
+});
+
+export const loginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Reset token is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters")
+    .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain at least one lowercase letter, one uppercase letter, and one number"),
+});
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+export type LoginRequest = z.infer<typeof loginSchema>;
+export type ForgotPasswordRequest = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordRequest = z.infer<typeof resetPasswordSchema>;
+// Session type is handled by connect-pg-simple, not Drizzle
+// export type Session = typeof sessions.$inferSelect;

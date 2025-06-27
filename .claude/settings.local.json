@@ -15,7 +15,12 @@
       "Bash(ls:*)",
       "Bash(npm run build:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(npm install:*)",
+      "Bash(touch:*)",
+      "Bash(npx:*)"
     ],
     "deny": []
   }
