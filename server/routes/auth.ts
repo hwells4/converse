@@ -17,7 +17,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { requireAuth, requireGuest, type AuthenticatedRequest } from "../middleware/auth";
 import rateLimit from "express-rate-limit";
-import { sendPasswordResetEmail } from "../utils/email-service";
+import { sendPasswordResetEmail, sendInvitationEmail } from "../utils/email-service";
 
 const router = Router();
 
@@ -508,8 +508,28 @@ router.post("/create-invitation", requireAuth, async (req, res) => {
       })
       .returning();
 
+    // Send email if email address is provided and sendEmail is not explicitly false
+    const sendEmail = req.body.sendEmail !== false; // Default to true
+    let emailSent = false;
+    
+    if (newInvitation.email && sendEmail) {
+      try {
+        await sendInvitationEmail(
+          newInvitation.email, 
+          newInvitation.token,
+          authenticatedReq.user.username
+        );
+        emailSent = true;
+      } catch (emailError) {
+        console.error("Failed to send invitation email:", emailError);
+        // Don't fail the whole request if email fails
+      }
+    }
+
     res.status(201).json({
-      message: "Invitation token created successfully",
+      message: emailSent 
+        ? "Invitation token created and email sent successfully"
+        : "Invitation token created successfully",
       invitation: {
         id: newInvitation.id,
         token: newInvitation.token,
@@ -517,6 +537,7 @@ router.post("/create-invitation", requireAuth, async (req, res) => {
         expiresAt: newInvitation.expiresAt,
         createdAt: newInvitation.createdAt,
       },
+      emailSent,
     });
   } catch (error: any) {
     console.error("Create invitation error:", error);
@@ -591,6 +612,74 @@ router.post("/validate-invitation", async (req, res) => {
 
     res.status(500).json({
       message: "Failed to validate invitation",
+      error: "INTERNAL_ERROR",
+    });
+  }
+});
+
+// Send invitation email (separate endpoint for existing tokens)
+router.post("/send-invitation", requireAuth, async (req, res) => {
+  try {
+    const authenticatedReq = req as AuthenticatedRequest;
+    const { email, invitationToken } = req.body;
+
+    if (!email || !invitationToken) {
+      return res.status(400).json({
+        message: "Email and invitation token are required",
+        error: "MISSING_REQUIRED_FIELDS",
+      });
+    }
+
+    // Verify the invitation token exists and is valid
+    const invitation = await db
+      .select()
+      .from(invitationTokens)
+      .where(eq(invitationTokens.token, invitationToken))
+      .limit(1);
+
+    if (invitation.length === 0) {
+      return res.status(404).json({
+        message: "Invitation token not found",
+        error: "INVALID_TOKEN",
+      });
+    }
+
+    const token = invitation[0];
+
+    if (token.isUsed) {
+      return res.status(400).json({
+        message: "Invitation token has already been used",
+        error: "TOKEN_USED",
+      });
+    }
+
+    if (token.expiresAt && new Date() > token.expiresAt) {
+      return res.status(400).json({
+        message: "Invitation token has expired",
+        error: "TOKEN_EXPIRED",
+      });
+    }
+
+    // Send the invitation email
+    await sendInvitationEmail(email, invitationToken, authenticatedReq.user.username);
+
+    res.json({
+      message: "Invitation email sent successfully",
+      email,
+      token: invitationToken,
+    });
+  } catch (error: any) {
+    console.error("Send invitation email error:", error);
+    
+    if (error.message?.includes("Failed to send invitation email")) {
+      return res.status(500).json({
+        message: "Failed to send invitation email",
+        error: "EMAIL_SEND_FAILED",
+      });
+    }
+
+    res.status(500).json({
+      message: "Failed to send invitation",
       error: "INTERNAL_ERROR",
     });
   }

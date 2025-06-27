@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -44,6 +44,18 @@ export default function SignUpPage() {
     confirmPassword: "",
     invitationToken: "",
   });
+
+  // Pre-populate invitation token from URL query parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token');
+    if (tokenFromUrl) {
+      setFormData(prev => ({
+        ...prev,
+        invitationToken: tokenFromUrl
+      }));
+    }
+  }, []);
 
   const signUpMutation = useMutation({
     mutationFn: async (data: Omit<SignUpForm, 'confirmPassword'>): Promise<SignUpResponse> => {
