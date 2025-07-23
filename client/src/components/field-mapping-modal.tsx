@@ -8,6 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, FileText, AlertCircle, CheckCircle, ArrowRight, Upload, Eye, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import type { N8NWebhookPayload, CommissionStatement } from "@shared/schema";
 
 interface FieldMappingModalProps {
   documentId: number;
@@ -105,6 +108,7 @@ const SALESFORCE_FIELDS = [
 ];
 
 export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProps) {
+  const { toast } = useToast();
   const { data: document, isLoading: documentLoading } = useDocument(documentId);
   const { data: csvData, isLoading: csvLoading, error: csvError } = useDocumentCSVData(documentId);
   const [extractedColumns, setExtractedColumns] = useState<ExtractedColumn[]>([]);
@@ -216,16 +220,96 @@ export function FieldMappingModal({ documentId, onClose }: FieldMappingModalProp
     setCurrentStep('mapping');
   };
 
-  const handleUploadToSalesforce = () => {
-    // TODO: Convert editablePreviewData to CSV format and upload
-    console.log('Uploading edited data to Salesforce:', editablePreviewData);
-    
-    // This will eventually:
-    // 1. Convert editablePreviewData to CSV format
-    // 2. Send the CSV data to the backend for Salesforce upload
-    // 3. Update document status to 'uploaded'
-    
-    onClose();
+  const handleUploadToSalesforce = async () => {
+    try {
+      // Get the document and carrier information
+      // Note: In this simplified implementation, we'll need to fetch carrier info
+      // For now, using a placeholder since carrier data isn't directly available
+      const carrierId = document?.carrierId;
+      if (!carrierId) {
+        throw new Error("Document carrier ID not found");
+      }
+      
+      if (!document) {
+        toast({
+          title: "Error",
+          description: "Document information not found",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update document status to "uploading"
+      await apiRequest("PATCH", `/api/documents/${documentId}`, {
+        status: "uploading"
+      });
+
+      // First, upload the processed CSV data to S3
+      const csvUploadResponse = await apiRequest("POST", "/api/s3/upload-processed-csv", {
+        csvData: editablePreviewData,
+        fileName: document.filename,
+        carrierId: carrierId,
+        documentId: documentId
+      });
+
+      const csvUploadResult = await csvUploadResponse.json();
+      
+      if (!csvUploadResult.success) {
+        throw new Error(csvUploadResult.message || "Failed to upload CSV to S3");
+      }
+
+      // Extract mapped field headers for N8N reference
+      const mappedHeaders = Object.entries(fieldMapping)
+        .filter(([_, salesforceField]) => salesforceField !== 'skip')
+        .map(([headerIndex, salesforceField]) => {
+          const fieldLabel = SALESFORCE_FIELDS.find(f => f.value === salesforceField)?.label;
+          return fieldLabel || salesforceField;
+        });
+
+      // Create a basic commission statement from document data
+      const statement: CommissionStatement = {
+        carrierId: carrierId,
+        carrierName: "Unknown Carrier", // Would need to fetch carrier details
+        carrierSalesforceId: "", // Would need carrier data
+        statementAmount: 0, // This would need to be calculated from the data
+        statementDate: new Date().toISOString(),
+        statementNotes: `Processed from ${document.filename}`
+      };
+
+      // Prepare the N8N webhook payload with S3 reference
+      const payload: N8NWebhookPayload = {
+        statement,
+        transactions: {
+          csvS3Key: csvUploadResult.csvS3Key,
+          csvUrl: csvUploadResult.csvUrl,
+          headers: mappedHeaders
+        },
+        transactionCount: editablePreviewData.length,
+        documentId: documentId,
+        fileName: document.filename
+      };
+
+      // Send to N8N webhook
+      const n8nResponse = await apiRequest("POST", "/api/n8n/salesforce-upload", payload);
+      const n8nResult = await n8nResponse.json();
+      
+      console.log("N8N webhook response:", n8nResult);
+
+      toast({
+        title: "Upload Successful", 
+        description: `Commission statement and ${editablePreviewData.length} transactions sent to Salesforce.`,
+      });
+
+      onClose();
+      
+    } catch (error) {
+      console.error("Failed to upload to Salesforce:", error);
+      toast({
+        title: "Upload Failed",
+        description: error instanceof Error ? error.message : "Failed to upload to Salesforce",
+        variant: "destructive",
+      });
+    }
   };
 
   const mappedFieldsCount = Object.values(fieldMapping).filter(field => field !== 'skip').length;

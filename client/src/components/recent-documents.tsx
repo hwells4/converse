@@ -12,6 +12,7 @@ import { FailedTransactionsReview } from "./failed-transactions-review";
 import { FileText, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { Document as DocumentType } from "@shared/schema";
 
 
@@ -263,9 +264,35 @@ export function RecentDocuments() {
         onClose={() => setFailedTransactionsData(null)}
         failedTransactions={failedTransactionsData.failedTransactions}
         document={failedTransactionsData.document}
-        onResubmit={(correctedTransactions) => {
+        onResubmit={async (correctedTransactions) => {
           console.log("Corrected transactions:", correctedTransactions);
-          // TODO: Implement resubmission to Salesforce
+          
+          try {
+            const response = await apiRequest("POST", `/api/documents/${failedTransactionsData.document.id}/resubmit-failed-transactions`, {
+              correctedTransactions
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+              toast({
+                title: "Resubmission Successful",
+                description: `${correctedTransactions.length} corrected transactions have been resubmitted to Salesforce.`,
+              });
+              
+              // Close the modal
+              setFailedTransactionsData(null);
+            } else {
+              throw new Error(result.message || "Failed to resubmit transactions");
+            }
+          } catch (error) {
+            console.error("Failed to resubmit transactions:", error);
+            toast({
+              title: "Resubmission Failed",
+              description: error instanceof Error ? error.message : "Failed to resubmit transactions to Salesforce",
+              variant: "destructive",
+            });
+          }
         }}
       />
     );

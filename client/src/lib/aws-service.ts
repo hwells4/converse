@@ -28,7 +28,9 @@ export interface PDFParserParams {
 }
 
 export class AWSService {
-  private static apiBaseUrl = 'https://db59eecd-7dcd-4e12-a7ea-047fe8f08497-00-2h9g2oppbu6bq.riker.replit.dev';
+  private static apiBaseUrl = typeof window !== 'undefined' 
+    ? window.location.origin 
+    : 'http://localhost:5000';
 
   /**
    * Upload file to S3 using backend-generated presigned URL

@@ -156,7 +156,7 @@ router.post("/documents/:id/resubmit-failed-transactions", async (req, res) => {
     
     // Configuration for easy switching between test and production
     // Set COMMISSION_CORRECTION_WEBHOOK_URL environment variable to override, or change USE_PRODUCTION_CORRECTION below
-    const USE_PRODUCTION_CORRECTION = false; // Change this to true for production
+    const USE_PRODUCTION_CORRECTION = true; // Production mode enabled
     const TEST_MODE = false; // Change this to true to skip N8N webhook calls for testing
     
     const correctionWebhookUrl = process.env.COMMISSION_CORRECTION_WEBHOOK_URL || (USE_PRODUCTION_CORRECTION ? N8N_CORRECTION_PROD_URL : N8N_CORRECTION_TEST_URL);

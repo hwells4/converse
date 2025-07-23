@@ -151,10 +151,13 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              <div className="w-full bg-gray-200 text-gray-600 py-3 px-6 rounded-lg font-medium text-center border border-gray-300 group-hover:bg-blue-50 group-hover:text-blue-700 group-hover:border-blue-200 transition-all cursor-pointer">
+              <button 
+                onClick={() => window.open('mailto:support@converseai.com?subject=Custom Requirements&body=Hi, I would like to discuss custom features for the Converse AI Hub platform.', '_blank')}
+                className="w-full bg-gray-200 text-gray-600 py-3 px-6 rounded-lg font-medium text-center border border-gray-300 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all cursor-pointer group"
+              >
                 <span className="group-hover:hidden">Need something more?</span>
                 <span className="hidden group-hover:inline">Let's talk about your needs</span>
-              </div>
+              </button>
             </div>
           </div>
         </div>

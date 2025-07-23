@@ -38,7 +38,7 @@ router.post("/n8n/salesforce-upload", async (req, res) => {
     
     // Use environment variable or default to test URL
     // Set N8N_WEBHOOK_URL environment variable to override, or change USE_PRODUCTION_N8N below
-    const USE_PRODUCTION_N8N = false; // Change this to true for production
+    const USE_PRODUCTION_N8N = true; // Production mode enabled
     const TEST_MODE = false; // Change this to true to skip N8N webhook calls for testing
     
     const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL || (USE_PRODUCTION_N8N ? N8N_PROD_URL : N8N_TEST_URL);

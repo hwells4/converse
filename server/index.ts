@@ -50,7 +50,18 @@ app.use(session({
 
 // Add CORS headers to allow frontend to communicate with backend
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  // Secure CORS configuration for production
+  const allowedOrigins = process.env.NODE_ENV === 'production' 
+    ? [process.env.CLIENT_URL].filter(Boolean) 
+    : ['http://localhost:3000', 'http://localhost:5000', 'http://localhost:5173'];
+  
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  } else if (process.env.NODE_ENV !== 'production') {
+    // Allow all origins in development
+    res.header('Access-Control-Allow-Origin', '*');
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   

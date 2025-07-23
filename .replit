@@ -8,8 +8,8 @@ packages = ["psmisc"]
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["echo", "Using dev mode to avoid caching issues"]
-run = ["npm", "run", "dev"]
+build = ["npm", "run", "build"]
+run = ["npm", "run", "start"]
 
 [[ports]]
 localPort = 5000
