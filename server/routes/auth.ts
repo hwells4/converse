@@ -14,7 +14,7 @@ import {
   resetPasswordSchema,
   type User 
 } from "../../shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gt, or, isNull } from "drizzle-orm";
 import { requireAuth, requireGuest, type AuthenticatedRequest } from "../middleware/auth";
 import rateLimit from "express-rate-limit";
 import { sendPasswordResetEmail, sendInvitationEmail } from "../utils/email-service";
@@ -54,7 +54,15 @@ router.post("/register", authLimiter, requireGuest, async (req, res) => {
     const invitation = await db
       .select()
       .from(invitationTokens)
-      .where(eq(invitationTokens.token, validatedData.invitationToken))
+      .where(
+        and(
+          eq(invitationTokens.token, validatedData.invitationToken),
+          or(
+            isNull(invitationTokens.expiresAt),
+            gt(invitationTokens.expiresAt, new Date())
+          )
+        )
+      )
       .limit(1);
 
     if (invitation.length === 0) {
@@ -74,13 +82,6 @@ router.post("/register", authLimiter, requireGuest, async (req, res) => {
       });
     }
 
-    // Check if token is expired
-    if (invitationToken.expiresAt && new Date() > invitationToken.expiresAt) {
-      return res.status(400).json({
-        message: "This invitation token has expired",
-        error: "INVITATION_EXPIRED",
-      });
-    }
 
     // If invitation is tied to a specific email, validate it matches
     if (invitationToken.email && invitationToken.email !== validatedData.email) {
@@ -566,7 +567,15 @@ router.post("/validate-invitation", async (req, res) => {
     const invitation = await db
       .select()
       .from(invitationTokens)
-      .where(eq(invitationTokens.token, validatedData.token))
+      .where(
+        and(
+          eq(invitationTokens.token, validatedData.token),
+          or(
+            isNull(invitationTokens.expiresAt),
+            gt(invitationTokens.expiresAt, new Date())
+          )
+        )
+      )
       .limit(1);
 
     if (invitation.length === 0) {
@@ -586,13 +595,6 @@ router.post("/validate-invitation", async (req, res) => {
       });
     }
 
-    // Check if token is expired
-    if (token.expiresAt && new Date() > token.expiresAt) {
-      return res.status(400).json({
-        message: "Invitation token has expired",
-        error: "TOKEN_EXPIRED",
-      });
-    }
 
     res.json({
       message: "Invitation token is valid",
