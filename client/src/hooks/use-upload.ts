@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AWSService } from "@/lib/aws-service";
 import { useCreateDocument, useUpdateDocument } from "./use-documents";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +21,15 @@ export function useUpload() {
   const createDocument = useCreateDocument();
   const updateDocument = useUpdateDocument();
   const { toast } = useToast();
+  
+  // Track active polling intervals for cleanup
+  const activeIntervalsRef = useRef<Set<NodeJS.Timeout>>(new Set());
+
+  // Cleanup function for intervals
+  const clearPollingInterval = (intervalId: NodeJS.Timeout) => {
+    clearInterval(intervalId);
+    activeIntervalsRef.current.delete(intervalId);
+  };
 
   const startPolling = (documentId: number) => {
     const pollInterval = setInterval(async () => {
@@ -28,7 +37,7 @@ export function useUpload() {
         const document = await AWSService.checkProcessingStatus(documentId);
         
         if (document.status === "processed" || document.status === "review_pending") {
-          clearInterval(pollInterval);
+          clearPollingInterval(pollInterval);
           setUploadState(prev => ({ ...prev, isProcessing: false }));
           
           toast({
@@ -36,7 +45,7 @@ export function useUpload() {
             description: "Document has been processed and is ready for review.",
           });
         } else if (document.status === "failed") {
-          clearInterval(pollInterval);
+          clearPollingInterval(pollInterval);
           setUploadState(prev => ({ ...prev, isProcessing: false, error: "Processing failed" }));
           
           toast({
@@ -50,8 +59,23 @@ export function useUpload() {
       }
     }, 5000);
     
-    setTimeout(() => clearInterval(pollInterval), 300000);
+    // Track this interval for cleanup
+    activeIntervalsRef.current.add(pollInterval);
+    
+    // Auto-cleanup after 5 minutes
+    setTimeout(() => {
+      clearPollingInterval(pollInterval);
+    }, 300000);
   };
+
+  // Cleanup all active intervals when component unmounts
+  useEffect(() => {
+    return () => {
+      // Clear all active polling intervals on unmount
+      activeIntervalsRef.current.forEach(clearPollingInterval);
+      activeIntervalsRef.current.clear();
+    };
+  }, []);
 
   const resetUpload = () => {
     setUploadState({
