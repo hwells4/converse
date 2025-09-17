@@ -304,7 +304,7 @@ router.post("/logout", async (req, res) => {
           });
         }
 
-        res.clearCookie("connect.sid"); // Clear the session cookie
+        res.clearCookie("sessionId"); // Clear the session cookie (matches session config name)
         res.json({
           message: "Logout successful",
         });

@@ -67,8 +67,9 @@ This is a full-stack TypeScript application for processing insurance commission 
     - `/webhooks` - Webhook handlers
       - `pdf-parser.ts` - PDF parser service webhooks
       - `document.ts` - Document processing webhooks
-      - `n8n.ts` - N8N completion webhooks
-      - `corrections.ts` - N8N correction webhooks
+      - `n8n-unified.ts` - N8N completion and correction webhooks (**ACTIVE**)
+      - `n8n.ts` - Legacy N8N webhooks (**DISABLED**)
+      - `corrections.ts` - Legacy correction webhooks (**REPLACED**)
     - `/integrations` - External service integrations
       - `n8n.ts` - N8N Salesforce upload endpoints
     - `/debug` - Development and testing routes
@@ -76,6 +77,7 @@ This is a full-stack TypeScript application for processing insurance commission 
   - `/schemas` - Request validation schemas
     - `request-schemas.ts` - Zod schemas for API requests
   - `/utils` - Utility functions
+    - `webhook-handler.ts` - Standardized webhook handling framework
     - `webhook-security.ts` - Webhook authentication helpers
     - `csv-parser.ts` - CSV parsing utilities
     - `email-service.ts` - Email service for password resets and invitation emails
@@ -107,7 +109,12 @@ This is a full-stack TypeScript application for processing insurance commission 
    - Triggers N8N webhook for Salesforce upload
    - N8N completion webhook updates document status to "completed"
 
-3. **Invitation-Only Registration Flow**:
+3. **N8N Integration Flow**:
+   - **Initial Upload**: Frontend → `/api/n8n/salesforce-upload` → N8N webhook → Salesforce → N8N callback → `/api/webhook/n8n-completion`
+   - **Corrections**: Frontend → `/api/documents/:id/resubmit-failed-transactions` → N8N correction webhook → Salesforce → N8N callback → `/api/webhook/n8n-correction-completion`
+   - **Transaction Reconciliation**: Uses "simple math logic" (v2) to track successful/failed transactions
+
+4. **Invitation-Only Registration Flow**:
    - Admin creates invitation token via script or API
    - Invitation email automatically sent to recipient (if email provided)
    - User receives professional invitation email with direct signup link
@@ -117,7 +124,7 @@ This is a full-stack TypeScript application for processing insurance commission 
 
 ### API Endpoints
 
-#### Authentication (`/server/routes/auth.ts`) **[NEW]**
+#### Authentication (`/server/routes/auth.ts`)
 - `POST /api/auth/register` - User registration with invitation token validation
 - `POST /api/auth/login` - User login with session creation
 - `POST /api/auth/logout` - User logout and session destruction
@@ -125,7 +132,7 @@ This is a full-stack TypeScript application for processing insurance commission 
 - `POST /api/auth/forgot-password` - Request password reset email
 - `POST /api/auth/reset-password` - Reset password with token
 
-#### Invitation Management (`/server/routes/auth.ts`) **[NEW]**
+#### Invitation Management (`/server/routes/auth.ts`)
 - `POST /api/auth/create-invitation` - Create invitation tokens with optional email sending
 - `POST /api/auth/validate-invitation` - Validate invitation token before signup
 - `POST /api/auth/send-invitation` - Send invitation email for existing token
@@ -171,8 +178,9 @@ This is a full-stack TypeScript application for processing insurance commission 
 - **N8N Unified** (`/server/routes/webhooks/n8n-unified.ts`) **[ACTIVE]**
   - `POST /api/webhook/n8n-completion` - N8N completion callback with standardized handling
   - `POST /api/webhook/n8n-correction-completion` - N8N correction completion callback
-- **Legacy N8N** (`/server/routes/webhooks/n8n.ts`) **[DISABLED]**
-  - Replaced by unified webhook system
+- **Legacy Webhooks** (Disabled/Replaced)
+  - `/server/routes/webhooks/n8n.ts` - Replaced by unified system
+  - `/server/routes/webhooks/corrections.ts` - Replaced by unified system
 
 #### N8N Integration (`/server/routes/integrations/n8n.ts`)
 - `POST /api/n8n/salesforce-upload` - Trigger Salesforce upload
@@ -181,12 +189,13 @@ This is a full-stack TypeScript application for processing insurance commission 
 
 #### Debug/Test (`/server/routes/debug/test.ts`)
 - `POST /api/test/webhook-simulation` - Simulate webhook calls
+- `GET /api/test/webhook-endpoints` - List all webhook endpoints
 - `ALL /api/webhook/*` - Debug webhook logger
 
 ### Environment Variables Required
 - `DATABASE_URL` - PostgreSQL connection string
 - `SESSION_SECRET` - Secret key for session signing (change in production)
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` - Email service configuration for password resets and invitations
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` - Email service configuration
 - `SMTP_SECURE` - Whether to use secure SMTP connection (true/false)
 - `FROM_NAME` - Display name for outgoing emails (defaults to "Converse AI Hub")
 - `CLIENT_URL` - Frontend URL for password reset and invitation links (defaults to http://localhost:5000)
@@ -194,7 +203,9 @@ This is a full-stack TypeScript application for processing insurance commission 
 - `AWS_S3_BUCKET` - S3 bucket name
 - `PDF_PARSER_WEBHOOK_URL` - Railway service webhook URL
 - `EXPECTED_LAMBDA_WEBHOOK_SECRET` - Webhook security secret
-- `N8N_WEBHOOK_URL` - N8N integration webhook URL
+- `N8N_WEBHOOK_URL` - N8N integration webhook URL (override for production URLs)
+- `COMMISSION_CORRECTION_WEBHOOK_URL` - N8N correction webhook URL override
+- `WEBHOOK_BASE_URL` - Base URL for webhook callbacks
 
 ### Database Schema
 Main tables:
@@ -204,25 +215,102 @@ Main tables:
 - `carriers` - Insurance carriers with Salesforce IDs
 - `documents` - Uploaded documents with processing status tracking
 
-Document statuses: uploaded → processing → processed → salesforce_upload_pending → uploading → completed (or failed at any stage)
+Document statuses: 
+- Basic flow: `uploaded` → `processing` → `processed`/`review_pending` → `salesforce_upload_pending` → `uploading` → `completed`
+- Error states: `failed` (at any stage)
+- Correction flow: `completed_with_errors` → `correction_pending` → `completed`/`completed_with_errors`
 
-### Error Handling
-- Client errors handled with consistent HTTP status codes and error messages
-- Global error middleware in server/index.ts
-- Client-side error handling with toast notifications
-- Detailed logging for webhook requests and processing errors
+### Webhook System Details
 
-### Route Architecture Notes
-- Routes are modularized by functionality for better maintainability
-- Each route module uses Express Router for isolated routing
-- The main `routes.ts` file provides backward compatibility by re-exporting from modular files
-- Request validation schemas are centralized in `/server/schemas/request-schemas.ts`
-- Utility functions (CSV parsing, webhook security) are extracted to `/server/utils`
-- This structure allows for:
-  - Easier debugging and testing of specific functionality
-  - Reduced merge conflicts when multiple developers work on different features
-  - Better code organization and separation of concerns
-  - Gradual migration from legacy code patterns
+#### N8N Production URLs
+- Upload: `https://hwells4.app.n8n.cloud/webhook/832afa61-2bcc-433c-8df6-192009696764`
+- Correction: `https://hwells4.app.n8n.cloud/webhook/commission-correction`
+- Test endpoints available with `/webhook-test/` prefix
+
+#### Webhook Handler Infrastructure
+All webhooks use standardized handler (`/server/utils/webhook-handler.ts`):
+- Unique webhook IDs for request tracking
+- Zod schema validation with detailed errors
+- Consistent response format: `{ success, message, data?, error? }`
+- Performance tracking (duration logging)
+- Comprehensive request/response logging
+
+#### Security Implementation
+- **Lambda webhooks**: Validate via `x-webhook-secret` header and User-Agent patterns
+- **N8N webhooks**: Currently no authentication (relies on URL obscurity)
+- **Recommendation**: Implement webhook signatures for all external services
+
+### Reliability Improvements
+
+#### ✅ Recently Fixed Issues
+1. **CSV Parser Robustness** (`/server/utils/csv-parser.ts`): **FIXED**
+   - ✅ Handles malformed CSV with unclosed quotes and escaped quotes
+   - ✅ Memory protection with size limits (10MB files, 50K lines, 50K chars/line, 1K fields/line)
+   - ✅ Error recovery - continues parsing when individual rows fail
+   - ✅ Comprehensive error logging and validation
+   - ✅ Returns `parseErrors` array for debugging failed rows
+
+2. **Session Cookie Management** (`/server/routes/auth.ts:307`): **FIXED**
+   - ✅ Logout now properly clears "sessionId" cookie (matches session config)
+   - ✅ Prevents orphaned sessions on logout
+
+#### Remaining Known Issues
+
+#### Data Integrity Issues
+1. **Transaction Count Validation** (`/server/routes/webhooks/n8n-unified.ts:204`):
+   - Can fail silently if counts don't match
+   - Complex reconciliation logic may have edge cases
+
+2. **Invitation Token Expiry** (`/server/routes/auth.ts:422-424`):
+   - SQL query doesn't properly filter by expiry in WHERE clause
+
+#### Performance Issues
+1. **No Database Connection Pooling**: Could exhaust connections under load
+2. **Missing Database Indexes**: No indexes on frequently queried fields
+3. **Memory Leaks** (`/client/src/hooks/use-upload.ts:52-54`): Polling continues after unmount
+
+#### Error Handling Gaps
+1. **Frontend Error Parsing** (`/client/src/lib/aws-service.ts:236-245`): Assumes JSON in error responses
+2. **Session Destruction Race Condition** (`/server/middleware/auth.ts:77-80`): Doesn't await completion
+3. **No Email Retry Logic**: Failed emails are lost
+4. **Missing Error States**: Document page doesn't handle auth loading failures
+
+#### Security Notes
+- **CORS Configuration**: Development allows all origins (acceptable for small company deployment)
+- **N8N Webhook Authentication**: No signature validation (relies on URL obscurity - acceptable for controlled environment)
+
+### Debugging Tips
+
+#### Webhook Testing
+1. Use `/api/test/webhook-simulation` to simulate webhook calls
+2. Check `/api/test/webhook-endpoints` for all available webhook URLs
+3. All `/api/webhook/*` requests are logged for debugging
+4. Look for webhook IDs in logs for request tracking
+
+#### Common Issues
+1. **"User not found in session"**: Session expired or user deleted
+2. **CSV parsing errors**: 
+   - Check server logs for specific row-level errors
+   - Look for `parseErrors` array in response for detailed failure info
+   - CSV parser now handles most malformed data gracefully
+   - Check for files exceeding limits (10MB, 50K rows, 50K chars/line)
+3. **N8N webhook failures**: Verify payload format (expects arrays)
+4. **Document stuck in status**: Check webhook logs for failed callbacks
+5. **Session logout issues**: Fixed - now properly clears sessionId cookie
+
+#### Testing Commands
+```bash
+# Test webhook connectivity
+curl -X POST http://localhost:5000/api/test-webhook
+
+# List all webhook endpoints
+curl http://localhost:5000/api/test/webhook-endpoints
+
+# Simulate N8N completion
+curl -X POST http://localhost:5000/api/test/webhook-simulation \
+  -H "Content-Type: application/json" \
+  -d '{"endpoint": "n8n-completion", "documentId": "123"}'
+```
 
 ## Development Guidelines
 
@@ -230,7 +318,7 @@ Document statuses: uploaded → processing → processed → salesforce_upload_p
 - **CRITICAL**: AWS credentials MUST NEVER be exposed in client-side code or `VITE_` prefixed environment variables
 - All AWS operations (S3, Lambda) MUST be executed server-side only
 - Use presigned URLs for client-side S3 uploads
-- Validate all webhook requests with security tokens where possible
+- Implement webhook signatures for all external service callbacks
 - **Authentication**: All protected API endpoints require valid session authentication
 - **Password Security**: Passwords are hashed with bcrypt (12 rounds) and never stored in plaintext
 - **Session Security**: Sessions use secure cookies with httpOnly, sameSite, and secure flags in production
@@ -243,23 +331,56 @@ Document statuses: uploaded → processing → processed → salesforce_upload_p
 - **UI Components**: Prioritize shadcn/ui components for consistency (`@/components/ui`)
 - **State Management**: Use TanStack Query for server state, React hooks for local UI state
 - **Error Handling**: Use toast notifications via `use-toast.ts` for user feedback
+- **Webhook Processing**: Use standardized webhook handler for all external callbacks
 
 ### File Storage Architecture
 - **S3 Storage**: All user files (PDFs) and processed outputs (CSV/JSON) stored in AWS S3
 - **Database**: PostgreSQL stores only metadata and references (S3 keys/URLs), never binary data
 - **S3 Key Convention**: `uploads/<carrier_id>/<uuid>/<filename>` for uploads, `processed/<carrier_id>/<uuid>/` for outputs
 
-### Webhook System Architecture
-- **Standardized Handler**: All webhooks use `/server/utils/webhook-handler.ts` for consistent logging, validation, and error handling
-- **N8N Unified Webhooks**: Current system uses `n8n-unified.ts` with standardized payload handling and correction logic
-- **Webhook Response Format**: All webhooks return standardized `WebhookResponse` interface with `success`, `message`, `data`, and `error` fields
-- **Payload Validation**: Webhooks validate incoming payloads using Zod schemas with detailed error reporting
-- **Correction Processing**: Advanced logic to handle N8N correction callbacks with transaction count reconciliation
+### CSV Processing System
+The CSV parser (`/server/utils/csv-parser.ts`) has been enhanced for production reliability:
+
+#### **Safety Limits**
+- Maximum file size: 10MB
+- Maximum rows: 50,000 
+- Maximum line length: 50,000 characters
+- Maximum fields per row: 1,000
+
+#### **Error Recovery**
+- Individual row failures don't stop entire parsing
+- Unclosed quotes handled gracefully with warnings
+- Escaped quotes (`""`) properly processed
+- Column count mismatches logged but parsing continues
+- Fails only if >10% of rows have errors
+
+#### **Error Reporting**
+- Returns `parseErrors` array with specific row failure details
+- Comprehensive logging for debugging
+- Row-level error tracking with line numbers
+- Memory usage warnings for large files
+
+#### **Usage Example**
+```typescript
+const result = parseCSVContent(csvContent);
+// result = {
+//   headers: string[],
+//   rows: Array<{value: string, confidence: number}[]>,
+//   parseErrors?: Array<{row: number, error: string}>
+// }
+```
+
+### Testing Best Practices
+- Test webhook flows using debug endpoints
+- Verify all document status transitions
+- Check error handling for all external service failures
+- Validate CSV parsing with edge cases
+- Test authentication flows including password reset
 
 ## Authentication System
 
 ### Implementation Details
-The application now uses a complete custom authentication system replacing any previous Clerk integration:
+The application uses a complete custom authentication system:
 
 #### Backend Authentication
 - **Session-based authentication** using `express-session` with PostgreSQL storage
@@ -272,7 +393,7 @@ The application now uses a complete custom authentication system replacing any p
 - **Custom auth pages**: Sign-in, Sign-up, Forgot Password, Reset Password
 - **Auth state management** using React Query
 - **Automatic redirects** for protected routes
-- **Session persistence** across browser sessions
+- **Session persistence** across browser sessions (2-week rolling expiry)
 - **User profile display** with logout functionality
 
 #### Demo Account
@@ -290,114 +411,16 @@ The following API endpoints require authentication:
 - N8N integrations
 - Document resubmission
 
-#### Authentication Workflow
-1. **Invitation**: Admin creates invitation tokens and sends professional invitation emails
-2. **Registration**: Users create accounts with username, email, password, and valid invitation token
-3. **Login**: Session-based authentication with secure cookies (2-week rolling expiry)
-4. **Password Reset**: Email-based reset flow with secure tokens
-5. **Route Protection**: Automatic redirect to sign-in for unauthenticated requests
-6. **Session Management**: Rolling sessions that extend on activity
+## Deployment Notes (Replit)
 
-## Invitation-Only Registration System
+### Replit Configuration
+- Application runs on port 5000 (configured in `.replit`)
+- PostgreSQL 16 module included
+- Environment variables managed through Replit Secrets
+- No need to run dev server - use Replit's built-in preview
 
-### Overview
-The application implements a complete invitation-only signup system to control user access. Public registration is disabled and all new users must have a valid invitation token.
-
-### Invitation Token Features
-- **Unique tokens**: Cryptographically secure 64-character hex tokens
-- **Email binding**: Tokens can be tied to specific email addresses
-- **Expiry control**: Configurable expiry (default 30 days)
-- **Single-use**: Tokens automatically marked as used after successful registration
-- **Audit trail**: Tracks who created tokens, when used, and by whom
-
-### Email Integration
-- **Professional email templates**: HTML and text versions with Converse AI Hub branding
-- **Direct signup links**: Email includes pre-filled signup URL with token
-- **Platform features showcase**: Email highlights AI-powered document processing capabilities
-- **Automatic sending**: Emails sent automatically when invitation created with email address
-- **Graceful fallback**: Shows token in console if email configuration missing
-
-### Admin Management Tools
-
-#### Command Line Scripts
-```bash
-# Create general invitation (any email can use)
-npm run create-invitation
-
-# Create email-specific invitation with auto-email
-npm run create-invitation -- --email user@example.com
-
-# Create invitation with custom expiry
-npm run create-invitation -- --email user@example.com --days 7
-
-# Create invitation without sending email
-npm run create-invitation -- --email user@example.com --no-email
-
-# List all invitations with status
-npm run list-invitations
-
-# List only unused invitations
-npm run list-invitations -- --unused-only
-```
-
-#### API Endpoints
-```bash
-# Create invitation with email sending
-POST /api/auth/create-invitation
-{
-  "email": "user@example.com",
-  "sendEmail": true  # optional, defaults to true
-}
-
-# Validate invitation before signup
-POST /api/auth/validate-invitation
-{
-  "token": "invitation-token-here"
-}
-
-# Send email for existing invitation
-POST /api/auth/send-invitation
-{
-  "email": "user@example.com",
-  "invitationToken": "existing-token"
-}
-
-# List all invitations (admin only)
-GET /api/auth/invitations
-```
-
-### User Experience
-1. **Admin creates invitation** via script or API
-2. **Professional email sent** with branded template and direct signup link
-3. **User clicks email link** and taken to signup page with token pre-filled
-4. **User completes registration** with username, email, password, and token
-5. **Token validated** against database (not used, not expired, email match)
-6. **Account created** and user immediately logged in
-7. **Token marked as used** to prevent reuse
-
-### Security Features
-- **Token validation**: Checks expiry, usage status, and email binding
-- **Rate limiting**: Prevents invitation spam
-- **Audit logging**: Full trail of invitation creation and usage
-- **Email verification**: Optional email binding ensures invitations reach intended recipients
-
-## UI Improvements
-
-### Profile Dropdown Menu
-- **Replaced inline profile display** with clean dropdown menu
-- **User avatar icon** that opens dropdown on click
-- **Professional layout** showing username, email, and logout option
-- **Consistent across pages** (home and documents)
-- **Better space utilization** in header area
-
-### Auto-Dismissing Toasts
-- **Login success toasts** automatically disappear after 5 seconds
-- **Consistent toast behavior** across all authentication actions
-- **User-friendly notifications** for all auth state changes
-
-### Branding Updates
-Application has been rebranded as **Converse AI Hub**:
-- All page headers and titles updated
-- Email templates use "Converse AI Hub" branding
-- Welcome messages emphasize "AI-powered" processing
-- Consistent branding across all authentication pages
+### Important Replit Considerations
+- Always use production build (`npm run build && npm start`)
+- Database migrations run automatically on deployment
+- Check Replit logs for webhook callback URLs
+- Ensure all environment variables are set in Secrets

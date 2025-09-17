@@ -174,6 +174,116 @@ router.post("/test/n8n-correction", async (req, res) => {
   }
 });
 
+// Test edge cases for transaction count validation
+router.post("/test/validation-edge-cases", async (req, res) => {
+  console.log('🧪 Testing transaction validation edge cases');
+  
+  const testCases = [
+    {
+      name: "Count Mismatch - Too Few Failed",
+      payload: {
+        documentId: 999,
+        status: "completed_with_errors",
+        completionData: {
+          carrierName: "Test Carrier",
+          numberOfSuccessful: 8,
+          totalTransactions: 10,
+          failedTransactions: [{ policyNumber: "TEST-001", error: "Policy not found" }], // Only 1 failed, should be 2
+          message: "Test with count mismatch",
+          completedAt: new Date().toISOString()
+        }
+      },
+      expectedError: "count_mismatch"
+    },
+    {
+      name: "Negative Counts",
+      payload: {
+        documentId: 999,
+        status: "completed",
+        completionData: {
+          carrierName: "Test Carrier",
+          numberOfSuccessful: -1,
+          totalTransactions: 10,
+          failedTransactions: [],
+          message: "Test with negative count",
+          completedAt: new Date().toISOString()
+        }
+      },
+      expectedError: "negative_counts"
+    },
+    {
+      name: "Correction Exceeds Failed Count", 
+      correctionPayload: {
+        documentId: 999,
+        totalProcessed: 5,
+        successCount: 3,
+        failureCount: 2,
+        results: {
+          successful: [{ policyNumber: "TEST-001" }],
+          failed: [{ policyNumber: "TEST-002", error: "Still failed" }]
+        }
+      },
+      setupCurrentFailed: 3, // Only 3 currently failed, but trying to process 5
+      expectedError: "Cannot process more transactions than currently failed"
+    }
+  ];
+  
+  const results = [];
+  
+  for (const testCase of testCases) {
+    try {
+      let response;
+      
+      if (testCase.correctionPayload) {
+        // Test correction endpoint
+        response = await fetch(`http://localhost:${process.env.PORT || 5000}/api/webhook/n8n-correction-completion`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(testCase.correctionPayload)
+        });
+      } else {
+        // Test completion endpoint
+        response = await fetch(`http://localhost:${process.env.PORT || 5000}/api/webhook/n8n-completion`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(testCase.payload)
+        });
+      }
+      
+      const result = await response.json();
+      
+      results.push({
+        testCase: testCase.name,
+        success: !result.success, // We expect these to fail
+        expectedError: testCase.expectedError,
+        actualResponse: result,
+        passed: !result.success && (result.message?.includes(testCase.expectedError) || result.error?.type === testCase.expectedError)
+      });
+      
+    } catch (error) {
+      results.push({
+        testCase: testCase.name,
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  }
+  
+  const passedTests = results.filter(r => r.passed).length;
+  const totalTests = results.length;
+  
+  res.json({
+    success: true,
+    message: `Validation edge case testing completed: ${passedTests}/${totalTests} tests passed`,
+    results,
+    summary: {
+      total: totalTests,
+      passed: passedTests,
+      failed: totalTests - passedTests
+    }
+  });
+});
+
 // List all available webhook endpoints
 router.get("/test/webhook-endpoints", (req, res) => {
   res.json({
@@ -197,6 +307,12 @@ router.get("/test/webhook-endpoints", (req, res) => {
         method: "POST", 
         description: "Document processing webhook",
         testEndpoint: "/api/test/webhook-simulation"
+      },
+      {
+        path: "/api/test/validation-edge-cases",
+        method: "POST",
+        description: "Test transaction validation edge cases",
+        testEndpoint: "/api/test/validation-edge-cases"
       }
     ]
   });

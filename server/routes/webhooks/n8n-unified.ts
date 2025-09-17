@@ -3,6 +3,51 @@ import { z } from "zod";
 import { storage } from "../../storage";
 import { handleWebhook, createWebhookHandler } from "../../utils/webhook-handler";
 
+// Utility functions for transaction validation
+function validateTransactionCounts(
+  successful: number, 
+  failed: number, 
+  total: number,
+  context: string
+): { isValid: boolean; error?: any } {
+  if (successful < 0 || failed < 0 || total < 0) {
+    return {
+      isValid: false,
+      error: {
+        type: "negative_counts",
+        context,
+        successful,
+        failed,
+        total
+      }
+    };
+  }
+  
+  if (successful + failed !== total) {
+    return {
+      isValid: false,
+      error: {
+        type: "count_mismatch",
+        context,
+        successful,
+        failed,
+        total,
+        actualTotal: successful + failed,
+        difference: total - (successful + failed)
+      }
+    };
+  }
+  
+  return { isValid: true };
+}
+
+function logTransactionState(documentId: number, stage: string, data: any) {
+  console.log(`📊 [${stage}] Document ${documentId} transaction state:`);
+  Object.entries(data).forEach(([key, value]) => {
+    console.log(`   ${key}: ${value}`);
+  });
+}
+
 const router = Router();
 
 // Simplified N8N completion webhook schema
@@ -88,6 +133,36 @@ const completionHandler = createWebhookHandler(
       console.log(`⚠️ ${completionData.failedTransactions.length} failed transactions`);
     }
 
+    // VALIDATION: Ensure transaction counts add up correctly
+    const successfulCount = completionData.numberOfSuccessful;
+    const failedCount = completionData.failedTransactions?.length || 0;
+    const totalTransactions = completionData.totalTransactions;
+    
+    logTransactionState(documentId, "COMPLETION", {
+      successful: successfulCount,
+      failed: failedCount,
+      total: totalTransactions
+    });
+    
+    const validation = validateTransactionCounts(
+      successfulCount,
+      failedCount,
+      totalTransactions,
+      "N8N completion"
+    );
+    
+    if (!validation.isValid) {
+      console.error('🚨 TRANSACTION COUNT VALIDATION FAILED:', validation.error);
+      
+      return {
+        success: false,
+        message: `Transaction count validation failed: ${validation.error?.type}`,
+        error: { ...validation.error, documentId }
+      };
+    }
+    
+    console.log(`✅ Transaction counts validated: ${successfulCount} + ${failedCount} = ${totalTransactions}`);
+
     // Update document in database
     const updatedDocument = await storage.updateDocument(documentId, {
       status,
@@ -151,26 +226,60 @@ const correctionHandler = createWebhookHandler(
     const currentMetadata = currentDocument.metadata as any;
     const currentCompletionData = currentMetadata?.completionData || {};
     const totalTransactions = currentCompletionData.totalTransactions || 0;
+    const currentSuccessfulCount = currentCompletionData.numberOfSuccessful || 0;
+    const currentFailedTransactions = currentCompletionData.failedTransactions || [];
+    const currentFailedCount = currentFailedTransactions.length;
     
-    // For corrections, we know exactly how many transactions were processed
-    // Since we can't reliably match by policy number (they may have changed),
-    // we'll use the counts to update the failed transactions
-    const currentFailedCount = currentCompletionData.failedTransactions?.length || 0;
-    const processedCount = totalProcessed;
+    console.log('🔍 [CORRECTION DEBUG] Current state:');
+    console.log('  - Total transactions:', totalTransactions);
+    console.log('  - Current successful:', currentSuccessfulCount);
+    console.log('  - Current failed count:', currentFailedCount);
+    console.log('  - Current failed policies:', currentFailedTransactions.map((tx: any) => tx.policyNumber));
+    console.log('🔍 [CORRECTION DEBUG] Correction attempt:');
+    console.log('  - Processed count:', totalProcessed);
+    console.log('  - Success count:', successCount);
+    console.log('  - Failure count:', failureCount);
     
-    console.log('🔍 [CORRECTION DEBUG] Current failed count:', currentFailedCount);
-    console.log('🔍 [CORRECTION DEBUG] Current failed transactions:', currentCompletionData.failedTransactions?.map((tx: any) => tx.policyNumber));
-    console.log('🔍 [CORRECTION DEBUG] Processed count:', processedCount);
-    console.log('🔍 [CORRECTION DEBUG] Success count:', successCount);
-    console.log('🔍 [CORRECTION DEBUG] Failure count:', failureCount);
+    // VALIDATION: Ensure correction counts make sense
+    const correctionValidation = validateTransactionCounts(
+      successCount,
+      failureCount,
+      totalProcessed,
+      "N8N correction"
+    );
     
-    // SIMPLEST APPROACH: 
-    // Original failed count - processed count + new failures = final failed count
-    // But since ALL processed transactions were from the failed list, we can just:
-    // 1. Remove ALL processed transactions (both successful and failed)
-    // 2. Add back ONLY the new failures
+    if (!correctionValidation.isValid) {
+      console.error('🚨 CORRECTION COUNT VALIDATION FAILED:', correctionValidation.error);
+      
+      return {
+        success: false,
+        message: `Correction count validation failed: ${correctionValidation.error?.type}`,
+        error: { ...correctionValidation.error, documentId }
+      };
+    }
     
-    const remainingFailedTransactions = [];  // Start fresh - we'll only keep new failures
+    // VALIDATION: Ensure we're not processing more than currently failed
+    if (totalProcessed > currentFailedCount) {
+      const validationError = {
+        documentId,
+        currentFailedCount,
+        totalProcessed,
+        excess: totalProcessed - currentFailedCount
+      };
+      
+      console.error('🚨 CORRECTION EXCEEDS FAILED COUNT:', validationError);
+      
+      return {
+        success: false,
+        message: "Cannot process more transactions than currently failed",
+        error: validationError
+      };
+    }
+    
+    // SIMPLIFIED CORRECTION LOGIC:
+    // 1. Add successful corrections to successful count
+    // 2. Replace failed transactions with only the NEW failures
+    const newSuccessfulCount = currentSuccessfulCount + successCount;
     
     const newFailedTransactions = (results.failed || []).map((failedResult: any) => ({
       type: "policy_not_found",
@@ -190,39 +299,47 @@ const correctionHandler = createWebhookHandler(
       commissionStatementId: failedResult.originalData?.statementId
     }));
     
-    // For corrections, the math is simple:
-    // New successful count = old successful + corrections that succeeded
-    const newSuccessfulCount = (currentCompletionData.numberOfSuccessful || 0) + successCount;
-    const allFailedTransactions = newFailedTransactions; // Only the new failures
+    console.log('🔍 [CORRECTION DEBUG] Calculated results:');
+    console.log('  - New successful count:', newSuccessfulCount);
+    console.log('  - New failed count:', newFailedTransactions.length);
+    console.log('  - New failed policies:', newFailedTransactions.map((tx: any) => tx.policyNumber));
     
-    console.log('🔍 [CORRECTION DEBUG] Remaining unprocessed:', remainingFailedTransactions.length);
-    console.log('🔍 [CORRECTION DEBUG] New failures from N8N:', newFailedTransactions.length);
-    console.log('🔍 [CORRECTION DEBUG] Final failed transactions:', allFailedTransactions.map((tx: any) => tx.policyNumber));
-    console.log('🔍 [CORRECTION DEBUG] Final counts - Success:', newSuccessfulCount, 'Failed:', allFailedTransactions.length);
+    // FINAL VALIDATION: Ensure total still adds up
+    logTransactionState(documentId, "FINAL_CORRECTION", {
+      successful: newSuccessfulCount,
+      failed: newFailedTransactions.length,
+      total: totalTransactions
+    });
     
-    // Validate calculations
-    if (newSuccessfulCount < 0 || newSuccessfulCount + allFailedTransactions.length !== totalTransactions) {
+    const finalValidation = validateTransactionCounts(
+      newSuccessfulCount,
+      newFailedTransactions.length,
+      totalTransactions,
+      "Final correction state"
+    );
+    
+    if (!finalValidation.isValid) {
+      console.error('🚨 FINAL VALIDATION FAILED:', finalValidation.error);
+      
       return {
         success: false,
-        message: "Data integrity error: transaction counts don't add up",
-        error: {
-          successful: newSuccessfulCount,
-          failed: allFailedTransactions.length,
-          total: totalTransactions
-        }
+        message: `Final validation failed: ${finalValidation.error?.type}`,
+        error: { ...finalValidation.error, documentId }
       };
     }
     
-    const finalStatus = allFailedTransactions.length === 0 ? "completed" : "completed_with_errors";
+    console.log('✅ All validation checks passed for correction');
+    
+    const finalStatus = newFailedTransactions.length === 0 ? "completed" : "completed_with_errors";
     
     // Update completion data
     const updatedCompletionData = {
       ...currentCompletionData,
       numberOfSuccessful: newSuccessfulCount,
-      failedTransactions: allFailedTransactions,
-      message: allFailedTransactions.length === 0 
+      failedTransactions: newFailedTransactions,
+      message: newFailedTransactions.length === 0 
         ? `All ${totalTransactions} transactions completed successfully` 
-        : `${newSuccessfulCount} of ${totalTransactions} transactions completed. ${allFailedTransactions.length} still have issues.`,
+        : `${newSuccessfulCount} of ${totalTransactions} transactions completed. ${newFailedTransactions.length} still have issues.`,
       lastCorrectionAt: new Date().toISOString(),
       correctionHistory: [
         ...(currentCompletionData.correctionHistory || []),
@@ -244,7 +361,7 @@ const correctionHandler = createWebhookHandler(
     });
     
     console.log(`✅ Document ${documentId} correction completed - Status: ${finalStatus}`);
-    console.log(`📊 Final counts: ${newSuccessfulCount} successful, ${allFailedTransactions.length} failed`);
+    console.log(`📊 Final counts: ${newSuccessfulCount} successful, ${newFailedTransactions.length} failed`);
     
     return {
       success: true,
@@ -254,7 +371,7 @@ const correctionHandler = createWebhookHandler(
         status: finalStatus,
         totalSuccessful: newSuccessfulCount,
         totalTransactions,
-        remainingFailed: allFailedTransactions.length,
+        remainingFailed: newFailedTransactions.length,
         isFullyComplete: finalStatus === "completed"
       }
     };
