@@ -75,9 +75,16 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     if (userResult.length === 0) {
       // User not found, clear session
-      req.session.destroy((err) => {
-        if (err) console.error("Session destroy error:", err);
-      });
+      try {
+        await new Promise<void>((resolve, reject) => {
+          req.session.destroy((err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+      } catch (err) {
+        console.error("Session destroy error:", err);
+      }
       return res.status(401).json({ 
         message: "User not found",
         error: "USER_NOT_FOUND"

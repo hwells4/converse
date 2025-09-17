@@ -290,26 +290,31 @@ router.post("/login", authLimiter, requireGuest, async (req, res) => {
 router.post("/logout", async (req, res) => {
   try {
     if (req.session) {
-      req.session.destroy((err) => {
-        if (err) {
-          console.error("Session destroy error during logout:", {
-            error: err,
-            message: err?.message,
-            code: err?.code,
-            sessionId: req.sessionID,
-            timestamp: new Date().toISOString()
+      try {
+        await new Promise<void>((resolve, reject) => {
+          req.session.destroy((err) => {
+            if (err) reject(err);
+            else resolve();
           });
-          return res.status(500).json({
-            message: "Logout failed",
-            error: "SESSION_ERROR",
-          });
-        }
+        });
 
         res.clearCookie("sessionId"); // Clear the session cookie (matches session config name)
         res.json({
           message: "Logout successful",
         });
-      });
+      } catch (err) {
+        console.error("Session destroy error during logout:", {
+          error: err,
+          message: err?.message,
+          code: err?.code,
+          sessionId: req.sessionID,
+          timestamp: new Date().toISOString()
+        });
+        return res.status(500).json({
+          message: "Logout failed",
+          error: "SESSION_ERROR",
+        });
+      }
     } else {
       res.json({
         message: "Already logged out",

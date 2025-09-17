@@ -283,11 +283,20 @@ All webhooks use standardized handler (`/server/utils/webhook-handler.ts`):
    - ✅ Maintains existing 5-minute timeout and status-based cleanup
    - ✅ Prevents unnecessary API calls and memory leaks
 
-#### Remaining Known Issues
+5. **Invitation Token Expiry Validation** (`/server/routes/auth.ts:60-63`): **FIXED**
+   - ✅ SQL query properly filters expired tokens using `gt(invitationTokens.expiresAt, new Date())`
+   - ✅ Handles both null expiry (no expiration) and future expiry dates correctly
+   - ✅ Prevents use of expired invitation tokens for registration
+   - ✅ Includes proper error handling for invalid/expired tokens
 
-#### Data Integrity Issues
-1. **Invitation Token Expiry** (`/server/routes/auth.ts:422-424`):
-   - SQL query doesn't properly filter by expiry in WHERE clause
+6. **Session Destruction Race Condition** (`/server/routes/auth.ts:294-299`, `/server/middleware/auth.ts:79-84`): **FIXED**
+   - ✅ Logout route now properly awaits session destruction before sending response
+   - ✅ Auth middleware awaits session destruction before returning 401 status
+   - ✅ Both locations use promisified session.destroy() to eliminate race conditions
+   - ✅ Prevents orphaned session state and ensures consistent cleanup timing
+   - ✅ Maintains existing error handling while ensuring proper async flow
+
+#### Remaining Known Issues
 
 #### Performance Issues
 1. **No Database Connection Pooling**: Could exhaust connections under load
@@ -295,9 +304,8 @@ All webhooks use standardized handler (`/server/utils/webhook-handler.ts`):
 
 #### Error Handling Gaps
 1. **Frontend Error Parsing** (`/client/src/lib/aws-service.ts:236-245`): Assumes JSON in error responses
-2. **Session Destruction Race Condition** (`/server/middleware/auth.ts:77-80`): Doesn't await completion
-3. **No Email Retry Logic**: Failed emails are lost
-4. **Missing Error States**: Document page doesn't handle auth loading failures
+2. **No Email Retry Logic**: Failed emails are lost
+3. **Missing Error States**: Document page doesn't handle auth loading failures
 
 #### Security Notes
 - **CORS Configuration**: Development allows all origins (acceptable for small company deployment)
