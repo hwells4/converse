@@ -25,6 +25,17 @@ export function useUpload() {
   // Track active polling intervals for cleanup
   const activeIntervalsRef = useRef<Set<NodeJS.Timeout>>(new Set());
 
+  // Cleanup all active intervals when component unmounts
+  useEffect(() => {
+    return () => {
+      // Clear all active polling intervals on unmount
+      activeIntervalsRef.current.forEach((intervalId) => {
+        clearInterval(intervalId);
+      });
+      activeIntervalsRef.current.clear();
+    };
+  }, []);
+
   // Cleanup function for intervals
   const clearPollingInterval = (intervalId: NodeJS.Timeout) => {
     clearInterval(intervalId);
@@ -67,15 +78,6 @@ export function useUpload() {
       clearPollingInterval(pollInterval);
     }, 300000);
   };
-
-  // Cleanup all active intervals when component unmounts
-  useEffect(() => {
-    return () => {
-      // Clear all active polling intervals on unmount
-      activeIntervalsRef.current.forEach(clearPollingInterval);
-      activeIntervalsRef.current.clear();
-    };
-  }, []);
 
   const resetUpload = () => {
     setUploadState({
