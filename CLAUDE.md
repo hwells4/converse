@@ -190,6 +190,9 @@ This is a full-stack TypeScript application for processing insurance commission 
 #### Debug/Test (`/server/routes/debug/test.ts`)
 - `POST /api/test/webhook-simulation` - Simulate webhook calls
 - `GET /api/test/webhook-endpoints` - List all webhook endpoints
+- `POST /api/test/validation-edge-cases` - Test transaction validation edge cases
+- `POST /api/test/n8n-completion` - Test N8N completion webhook
+- `POST /api/test/n8n-correction` - Test N8N correction webhook
 - `ALL /api/webhook/*` - Debug webhook logger
 
 ### Environment Variables Required
@@ -254,14 +257,17 @@ All webhooks use standardized handler (`/server/utils/webhook-handler.ts`):
    - ✅ Logout now properly clears "sessionId" cookie (matches session config)
    - ✅ Prevents orphaned sessions on logout
 
+3. **Transaction Count Validation** (`/server/routes/webhooks/n8n-unified.ts`): **FIXED**
+   - ✅ Added comprehensive validation for transaction counts in both completion and correction flows
+   - ✅ Rejects invalid data with clear error messages (`count_mismatch`, `negative_counts`)
+   - ✅ Simplified correction reconciliation logic with better validation
+   - ✅ Enhanced error logging and debugging information
+   - ✅ Prevents silent failures and ensures data integrity
+
 #### Remaining Known Issues
 
 #### Data Integrity Issues
-1. **Transaction Count Validation** (`/server/routes/webhooks/n8n-unified.ts:204`):
-   - Can fail silently if counts don't match
-   - Complex reconciliation logic may have edge cases
-
-2. **Invitation Token Expiry** (`/server/routes/auth.ts:422-424`):
+1. **Invitation Token Expiry** (`/server/routes/auth.ts:422-424`):
    - SQL query doesn't properly filter by expiry in WHERE clause
 
 #### Performance Issues
@@ -305,6 +311,14 @@ curl -X POST http://localhost:5000/api/test-webhook
 
 # List all webhook endpoints
 curl http://localhost:5000/api/test/webhook-endpoints
+
+# Test transaction validation edge cases
+curl -X POST http://localhost:5000/api/test/validation-edge-cases
+
+# Test N8N completion webhook
+curl -X POST http://localhost:5000/api/test/n8n-completion \
+  -H "Content-Type: application/json" \
+  -d '{"documentId": 1, "numberOfSuccessful": 8, "totalTransactions": 10}'
 
 # Simulate N8N completion
 curl -X POST http://localhost:5000/api/test/webhook-simulation \
