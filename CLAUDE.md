@@ -122,6 +122,17 @@ This is a full-stack TypeScript application for processing insurance commission 
    - System validates token (not used, not expired, email match if required)
    - User completes registration and token is marked as used
 
+5. **Document Processing Polling System**:
+   - PDF uploads trigger background processing and start status polling
+   - `useUpload` hook manages polling intervals with proper cleanup
+   - Polls `/api/documents/:id/status` every 5 seconds for processing updates
+   - **Memory-Safe Design**: All intervals tracked in `useRef<Set<NodeJS.Timeout>>`
+   - **Automatic Cleanup**: `useEffect` cleanup clears intervals on component unmount
+   - **Multi-Document Support**: Can handle multiple simultaneous uploads/polling
+   - **Timeout Protection**: Auto-stops polling after 5 minutes if no status change
+   - **Error Resilience**: Individual polling failures don't stop the process
+   - Notifies user via toast when processing completes or fails
+
 ### API Endpoints
 
 #### Authentication (`/server/routes/auth.ts`)
@@ -264,6 +275,14 @@ All webhooks use standardized handler (`/server/utils/webhook-handler.ts`):
    - ✅ Enhanced error logging and debugging information
    - ✅ Prevents silent failures and ensures data integrity
 
+4. **Upload Polling Memory Leak** (`/client/src/hooks/use-upload.ts`): **FIXED**
+   - ✅ Polling intervals now properly cleaned up when components unmount
+   - ✅ Tracks active intervals using `useRef<Set<NodeJS.Timeout>>` for cleanup
+   - ✅ `useEffect` cleanup function clears all intervals on unmount
+   - ✅ Fixed React Hook order violation for consistent hook execution
+   - ✅ Maintains existing 5-minute timeout and status-based cleanup
+   - ✅ Prevents unnecessary API calls and memory leaks
+
 #### Remaining Known Issues
 
 #### Data Integrity Issues
@@ -273,7 +292,6 @@ All webhooks use standardized handler (`/server/utils/webhook-handler.ts`):
 #### Performance Issues
 1. **No Database Connection Pooling**: Could exhaust connections under load
 2. **Missing Database Indexes**: No indexes on frequently queried fields
-3. **Memory Leaks** (`/client/src/hooks/use-upload.ts:52-54`): Polling continues after unmount
 
 #### Error Handling Gaps
 1. **Frontend Error Parsing** (`/client/src/lib/aws-service.ts:236-245`): Assumes JSON in error responses
