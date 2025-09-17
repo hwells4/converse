@@ -124,6 +124,7 @@ const n8nCorrectionPayloadSchema = z.object({
 const completionHandler = createWebhookHandler(
   "n8n-completion",
   async (payload: any, req, res) => {
+    console.log('🔍 DEBUG: Completion handler called with payload:', JSON.stringify(payload, null, 2));
     const { documentId, status, completionData } = payload;
     
     console.log(`📄 Processing completion for document ${documentId} with status: ${status}`);
